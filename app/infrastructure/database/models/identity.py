@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -10,6 +10,7 @@ from sqlalchemy import (
     String,
     Table,
     Text,
+    Time,
     Uuid,
     func,
 )
@@ -68,6 +69,11 @@ class UserModel(Base):
         Boolean,
         default=True,
         server_default="true",
+    )
+    daily_summary_time: Mapped[time] = mapped_column(
+        Time(),
+        default=time(21, 0),
+        server_default="21:00:00",
     )
     budget_alerts_enabled: Mapped[bool] = mapped_column(
         Boolean,

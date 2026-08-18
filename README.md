@@ -56,11 +56,11 @@ values to the local `.env` file:
 ```env
 MAIL_USERNAME=sender@gmail.com
 MAIL_APP_PASSWORD=your_16_character_app_password
-DAILY_SUMMARY_HOUR=21
-DAILY_SUMMARY_MINUTE=0
 ```
 
 Do not use or share the Gmail account's normal password. `.env` is ignored by
 Git. When both mail values are present, the API sends one expense summary per
-active user after the configured local time and one warning when a category
-first exceeds its monthly limit. Example-domain accounts are skipped.
+active user after that user's selected local time and one warning when a
+category first exceeds its monthly limit. New users default to 21:00 and can
+change the time from the application settings. Example-domain accounts are
+skipped.

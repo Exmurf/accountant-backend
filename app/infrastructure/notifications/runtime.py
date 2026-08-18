@@ -78,9 +78,6 @@ def send_daily_summaries() -> None:
         return
     timezone = ZoneInfo(settings.app_timezone)
     now = datetime.now(timezone)
-    scheduled = time(settings.daily_summary_hour, settings.daily_summary_minute)
-    if now.time() < scheduled:
-        return
     day_start = datetime.combine(now.date(), time.min, tzinfo=timezone)
     day_end = day_start + timedelta(days=1)
 
@@ -92,6 +89,13 @@ def send_daily_summaries() -> None:
                     _is_placeholder_address(user.email)
                     or not user.daily_summary_enabled
                 ):
+                    continue
+                scheduled_at = datetime.combine(
+                    now.date(),
+                    user.daily_summary_time,
+                    tzinfo=timezone,
+                )
+                if now < scheduled_at:
                     continue
                 try:
                     SendDailyExpenseSummary(

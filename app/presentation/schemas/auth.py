@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
@@ -22,6 +22,7 @@ class UserResponse(BaseModel):
     email: EmailStr
     display_name: str
     daily_summary_enabled: bool
+    daily_summary_time: time
     budget_alerts_enabled: bool
     roles: list[str]
     permissions: list[str]
@@ -34,6 +35,7 @@ class UserResponse(BaseModel):
             email=user.email,
             display_name=user.display_name,
             daily_summary_enabled=user.daily_summary_enabled,
+            daily_summary_time=user.daily_summary_time,
             budget_alerts_enabled=user.budget_alerts_enabled,
             roles=sorted(user.roles),
             permissions=sorted(user.permissions),
@@ -44,6 +46,7 @@ class UserResponse(BaseModel):
 class UpdateUserSettingsRequest(BaseModel):
     display_name: str = Field(min_length=2, max_length=100)
     daily_summary_enabled: bool
+    daily_summary_time: time
     budget_alerts_enabled: bool
 
 

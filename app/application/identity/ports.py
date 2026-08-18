@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time
 from typing import Protocol
 from uuid import UUID
 
@@ -19,6 +19,7 @@ class UserRepository(Protocol):
         user_id: UUID,
         display_name: str,
         daily_summary_enabled: bool,
+        daily_summary_time: time,
         budget_alerts_enabled: bool,
     ) -> User | None: ...
 

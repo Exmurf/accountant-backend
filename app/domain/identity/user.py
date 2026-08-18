@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, time
 from uuid import UUID
 
 
@@ -11,6 +11,7 @@ class User:
     password_hash: str
     is_active: bool
     daily_summary_enabled: bool
+    daily_summary_time: time
     budget_alerts_enabled: bool
     roles: frozenset[str]
     permissions: frozenset[str]

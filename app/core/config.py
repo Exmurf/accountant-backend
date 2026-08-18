@@ -29,8 +29,6 @@ class Settings(BaseSettings):
     mail_from_name: str = "Accountant"
     mail_smtp_host: str = "smtp.gmail.com"
     mail_smtp_port: int = Field(default=587, ge=1, le=65535)
-    daily_summary_hour: int = Field(default=21, ge=0, le=23)
-    daily_summary_minute: int = Field(default=0, ge=0, le=59)
 
     @property
     def mail_enabled(self) -> bool:

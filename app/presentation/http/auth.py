@@ -193,6 +193,7 @@ def update_me(
         user_id=user.id,
         display_name=payload.display_name,
         daily_summary_enabled=payload.daily_summary_enabled,
+        daily_summary_time=payload.daily_summary_time,
         budget_alerts_enabled=payload.budget_alerts_enabled,
     )
     return UserResponse.from_domain(updated_user)

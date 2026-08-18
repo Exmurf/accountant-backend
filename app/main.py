@@ -28,7 +28,7 @@ def create_app() -> FastAPI:
     application = FastAPI(
         title="Accountant API",
         description="Accountant gelir ve gider yönetimi API sözleşmesi",
-        version="0.4.0",
+        version="0.5.0",
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
         lifespan=lifespan,

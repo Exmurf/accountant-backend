@@ -14,6 +14,14 @@ class UserRepository(Protocol):
 
     def add(self, email: str, display_name: str, password_hash: str) -> User: ...
 
+    def update_settings(
+        self,
+        user_id: UUID,
+        display_name: str,
+        daily_summary_enabled: bool,
+        budget_alerts_enabled: bool,
+    ) -> User | None: ...
+
 
 class PasswordHasher(Protocol):
     def hash(self, password: str) -> str: ...

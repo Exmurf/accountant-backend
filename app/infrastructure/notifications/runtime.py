@@ -52,6 +52,7 @@ def notify_budget_limit(user_id: UUID, category_id: UUID) -> None:
                 user is None
                 or not user.is_active
                 or _is_placeholder_address(user.email)
+                or not user.budget_alerts_enabled
             ):
                 return
             SendBudgetExceededNotification(
@@ -87,7 +88,10 @@ def send_daily_summaries() -> None:
         with session_factory() as session:
             users = SqlAlchemyUserRepository(session).list_active()
             for user in users:
-                if _is_placeholder_address(user.email):
+                if (
+                    _is_placeholder_address(user.email)
+                    or not user.daily_summary_enabled
+                ):
                     continue
                 try:
                     SendDailyExpenseSummary(

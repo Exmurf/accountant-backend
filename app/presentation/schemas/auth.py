@@ -21,6 +21,8 @@ class UserResponse(BaseModel):
     id: UUID
     email: EmailStr
     display_name: str
+    daily_summary_enabled: bool
+    budget_alerts_enabled: bool
     roles: list[str]
     permissions: list[str]
     created_at: datetime
@@ -31,10 +33,18 @@ class UserResponse(BaseModel):
             id=user.id,
             email=user.email,
             display_name=user.display_name,
+            daily_summary_enabled=user.daily_summary_enabled,
+            budget_alerts_enabled=user.budget_alerts_enabled,
             roles=sorted(user.roles),
             permissions=sorted(user.permissions),
             created_at=user.created_at,
         )
+
+
+class UpdateUserSettingsRequest(BaseModel):
+    display_name: str = Field(min_length=2, max_length=100)
+    daily_summary_enabled: bool
+    budget_alerts_enabled: bool
 
 
 class LogoutResponse(BaseModel):

@@ -15,6 +15,7 @@ from app.application.identity.login_user import LoginUser
 from app.application.identity.refresh_session import RefreshSession
 from app.application.identity.register_user import RegisterUser
 from app.application.identity.revoke_session import RevokeSession
+from app.application.identity.update_settings import UpdateUserSettings
 from app.core.config import get_settings
 from app.domain.identity.user import User
 from app.infrastructure.database.repositories.refresh_tokens import (
@@ -32,6 +33,7 @@ from app.presentation.schemas.auth import (
     LoginRequest,
     LogoutResponse,
     RegisterRequest,
+    UpdateUserSettingsRequest,
     UserResponse,
 )
 
@@ -177,6 +179,23 @@ def refresh(
 @router.get("/me", response_model=UserResponse)
 def me(user: Annotated[User, Depends(get_current_user)]) -> UserResponse:
     return UserResponse.from_domain(user)
+
+
+@router.patch("/me", response_model=UserResponse)
+def update_me(
+    payload: UpdateUserSettingsRequest,
+    session: Annotated[Session, Depends(get_database_session)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> UserResponse:
+    updated_user = UpdateUserSettings(
+        SqlAlchemyUserRepository(session)
+    ).execute(
+        user_id=user.id,
+        display_name=payload.display_name,
+        daily_summary_enabled=payload.daily_summary_enabled,
+        budget_alerts_enabled=payload.budget_alerts_enabled,
+    )
+    return UserResponse.from_domain(updated_user)
 
 
 @router.post("/logout", response_model=LogoutResponse)

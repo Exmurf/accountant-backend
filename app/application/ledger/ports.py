@@ -2,6 +2,7 @@ from datetime import date, datetime
 from typing import Protocol
 from uuid import UUID
 
+from app.domain.ledger.budget import MonthlyBudget
 from app.domain.ledger.models import Category, Transaction, TransactionKind
 from app.domain.ledger.subscription import Subscription
 
@@ -83,3 +84,16 @@ class SubscriptionRepository(Protocol):
     ) -> Subscription | None: ...
 
     def deactivate(self, user_id: UUID, subscription_id: UUID) -> bool: ...
+
+
+class BudgetRepository(Protocol):
+    def list_for_user(self, user_id: UUID) -> list[MonthlyBudget]: ...
+
+    def upsert(
+        self,
+        user_id: UUID,
+        category: Category,
+        limit_minor: int,
+    ) -> MonthlyBudget: ...
+
+    def remove(self, user_id: UUID, category_id: UUID) -> bool: ...

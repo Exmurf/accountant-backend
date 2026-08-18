@@ -4,6 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.domain.ledger.budget import MonthlyBudget
 from app.domain.ledger.models import Category, Transaction, TransactionKind
 from app.domain.ledger.subscription import Subscription
 
@@ -123,3 +124,28 @@ class SubscriptionResponse(BaseModel):
 
 class SuccessResponse(BaseModel):
     success: bool = True
+
+
+class SetMonthlyBudgetRequest(BaseModel):
+    limit: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
+
+    def limit_as_minor(self) -> int:
+        return int(self.limit * 100)
+
+
+class MonthlyBudgetResponse(BaseModel):
+    id: UUID
+    category_id: UUID
+    category_name: str
+    category_color: str
+    limit_minor: int
+
+    @classmethod
+    def from_domain(cls, budget: MonthlyBudget) -> "MonthlyBudgetResponse":
+        return cls(
+            id=budget.id,
+            category_id=budget.category_id,
+            category_name=budget.category_name,
+            category_color=budget.category_color,
+            limit_minor=budget.limit_minor,
+        )

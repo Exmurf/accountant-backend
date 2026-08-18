@@ -7,7 +7,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.application.ledger.categories import CreateCategory, ListCategories
+from app.application.ledger.budgets import (
+    ListMonthlyBudgets,
+    RemoveMonthlyBudget,
+    SetMonthlyBudget,
+)
 from app.application.ledger.errors import (
+    BudgetNotFoundError,
     CategoryAlreadyExistsError,
     CategoryKindMismatchError,
     CategoryNotFoundError,
@@ -26,6 +32,7 @@ from app.domain.ledger.models import TransactionKind
 from app.core.config import get_settings
 from app.infrastructure.database.repositories.ledger import (
     SqlAlchemyCategoryRepository,
+    SqlAlchemyBudgetRepository,
     SqlAlchemySubscriptionRepository,
     SqlAlchemyTransactionRepository,
 )
@@ -36,6 +43,8 @@ from app.presentation.schemas.ledger import (
     CreateCategoryRequest,
     CreateTransactionRequest,
     CreateSubscriptionRequest,
+    MonthlyBudgetResponse,
+    SetMonthlyBudgetRequest,
     SuccessResponse,
     SubscriptionResponse,
     TransactionResponse,
@@ -43,6 +52,66 @@ from app.presentation.schemas.ledger import (
 )
 
 router = APIRouter(tags=["ledger"])
+
+
+@router.get("/budgets", response_model=list[MonthlyBudgetResponse])
+def list_monthly_budgets(
+    session: Annotated[Session, Depends(get_database_session)],
+    user: Annotated[User, Depends(require_permission("finance.read.self"))],
+) -> list[MonthlyBudgetResponse]:
+    budgets = ListMonthlyBudgets(SqlAlchemyBudgetRepository(session)).execute(user.id)
+    return [MonthlyBudgetResponse.from_domain(budget) for budget in budgets]
+
+
+@router.put(
+    "/budgets/{category_id}",
+    response_model=MonthlyBudgetResponse,
+)
+def set_monthly_budget(
+    category_id: UUID,
+    payload: SetMonthlyBudgetRequest,
+    session: Annotated[Session, Depends(get_database_session)],
+    user: Annotated[User, Depends(require_permission("finance.write.self"))],
+) -> MonthlyBudgetResponse:
+    try:
+        budget = SetMonthlyBudget(
+            categories=SqlAlchemyCategoryRepository(session),
+            budgets=SqlAlchemyBudgetRepository(session),
+        ).execute(
+            user_id=user.id,
+            category_id=category_id,
+            limit_minor=payload.limit_as_minor(),
+        )
+    except CategoryNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Kategori bulunamadı.",
+        ) from None
+    except CategoryKindMismatchError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Yalnızca gider kategorilerine bütçe limiti eklenebilir.",
+        ) from None
+    return MonthlyBudgetResponse.from_domain(budget)
+
+
+@router.delete("/budgets/{category_id}", response_model=SuccessResponse)
+def remove_monthly_budget(
+    category_id: UUID,
+    session: Annotated[Session, Depends(get_database_session)],
+    user: Annotated[User, Depends(require_permission("finance.write.self"))],
+) -> SuccessResponse:
+    try:
+        RemoveMonthlyBudget(SqlAlchemyBudgetRepository(session)).execute(
+            user.id,
+            category_id,
+        )
+    except BudgetNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Bütçe limiti bulunamadı.",
+        ) from None
+    return SuccessResponse()
 
 
 @router.get("/categories", response_model=list[CategoryResponse])

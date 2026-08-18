@@ -12,3 +12,7 @@ class CategoryAlreadyExistsError(Exception):
 
 class SubscriptionNotFoundError(Exception):
     pass
+
+
+class BudgetNotFoundError(Exception):
+    pass

@@ -108,6 +108,48 @@ class SubscriptionModel(Base):
     )
 
 
+class MonthlyBudgetModel(Base):
+    __tablename__ = "monthly_budgets"
+    __table_args__ = (
+        CheckConstraint(
+            "limit_minor > 0",
+            name="ck_monthly_budgets_limit_positive",
+        ),
+        UniqueConstraint(
+            "user_id",
+            "category_id",
+            name="uq_monthly_budgets_user_category",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+    )
+    category_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("categories.id", ondelete="CASCADE"),
+        index=True,
+    )
+    limit_minor: Mapped[int] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+    category: Mapped[CategoryModel] = relationship()
+
+
 class TransactionModel(Base):
     __tablename__ = "transactions"
     __table_args__ = (

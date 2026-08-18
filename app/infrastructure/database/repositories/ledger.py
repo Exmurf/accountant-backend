@@ -6,10 +6,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.application.ledger.errors import CategoryAlreadyExistsError
+from app.domain.ledger.budget import MonthlyBudget
 from app.domain.ledger.models import Category, Transaction, TransactionKind
 from app.domain.ledger.subscription import Subscription
 from app.infrastructure.database.models.ledger import (
     CategoryModel,
+    MonthlyBudgetModel,
     SubscriptionModel,
     TransactionModel,
 )
@@ -292,4 +294,75 @@ class SqlAlchemySubscriptionRepository:
             next_charge_date=model.next_charge_date,
             is_active=model.is_active,
             created_at=model.created_at,
+        )
+
+
+class SqlAlchemyBudgetRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def list_for_user(self, user_id: UUID) -> list[MonthlyBudget]:
+        models = self._session.scalars(
+            self._budget_query()
+            .join(MonthlyBudgetModel.category)
+            .where(MonthlyBudgetModel.user_id == user_id)
+            .order_by(CategoryModel.name)
+        ).all()
+        return [self._budget_to_domain(model) for model in models]
+
+    def upsert(
+        self,
+        user_id: UUID,
+        category: Category,
+        limit_minor: int,
+    ) -> MonthlyBudget:
+        model = self._session.scalar(
+            self._budget_query().where(
+                MonthlyBudgetModel.user_id == user_id,
+                MonthlyBudgetModel.category_id == category.id,
+            )
+        )
+        if model is None:
+            model = MonthlyBudgetModel(
+                user_id=user_id,
+                category_id=category.id,
+                limit_minor=limit_minor,
+            )
+            self._session.add(model)
+        else:
+            model.limit_minor = limit_minor
+        self._session.commit()
+        model.category = self._session.get(CategoryModel, category.id)
+        return self._budget_to_domain(model)
+
+    def remove(self, user_id: UUID, category_id: UUID) -> bool:
+        model = self._session.scalar(
+            select(MonthlyBudgetModel).where(
+                MonthlyBudgetModel.user_id == user_id,
+                MonthlyBudgetModel.category_id == category_id,
+            )
+        )
+        if model is None:
+            return False
+        self._session.delete(model)
+        self._session.commit()
+        return True
+
+    @staticmethod
+    def _budget_query():  # type: ignore[no-untyped-def]
+        return select(MonthlyBudgetModel).options(
+            selectinload(MonthlyBudgetModel.category)
+        )
+
+    @staticmethod
+    def _budget_to_domain(model: MonthlyBudgetModel) -> MonthlyBudget:
+        return MonthlyBudget(
+            id=model.id,
+            user_id=model.user_id,
+            category_id=model.category_id,
+            category_name=model.category.name,
+            category_color=model.category.color,
+            limit_minor=model.limit_minor,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
         )

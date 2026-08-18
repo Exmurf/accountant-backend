@@ -1,0 +1,1 @@
+"""Accountant FastAPI application package."""

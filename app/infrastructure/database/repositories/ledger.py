@@ -5,7 +5,10 @@ from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.application.ledger.errors import CategoryAlreadyExistsError
+from app.application.ledger.errors import (
+    BudgetAlreadyExistsError,
+    CategoryAlreadyExistsError,
+)
 from app.domain.ledger.budget import MonthlyBudget
 from app.domain.ledger.models import Category, Transaction, TransactionKind
 from app.domain.ledger.subscription import Subscription
@@ -332,6 +335,31 @@ class SqlAlchemyBudgetRepository:
         else:
             model.limit_minor = limit_minor
         self._session.commit()
+        model.category = self._session.get(CategoryModel, category.id)
+        return self._budget_to_domain(model)
+
+    def update(
+        self,
+        user_id: UUID,
+        budget_id: UUID,
+        category: Category,
+        limit_minor: int,
+    ) -> MonthlyBudget | None:
+        model = self._session.scalar(
+            self._budget_query().where(
+                MonthlyBudgetModel.id == budget_id,
+                MonthlyBudgetModel.user_id == user_id,
+            )
+        )
+        if model is None:
+            return None
+        model.category_id = category.id
+        model.limit_minor = limit_minor
+        try:
+            self._session.commit()
+        except IntegrityError as error:
+            self._session.rollback()
+            raise BudgetAlreadyExistsError from error
         model.category = self._session.get(CategoryModel, category.id)
         return self._budget_to_domain(model)
 

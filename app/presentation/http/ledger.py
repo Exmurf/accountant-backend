@@ -11,8 +11,10 @@ from app.application.ledger.budgets import (
     ListMonthlyBudgets,
     RemoveMonthlyBudget,
     SetMonthlyBudget,
+    UpdateMonthlyBudget,
 )
 from app.application.ledger.errors import (
+    BudgetAlreadyExistsError,
     BudgetNotFoundError,
     CategoryAlreadyExistsError,
     CategoryKindMismatchError,
@@ -49,6 +51,7 @@ from app.presentation.schemas.ledger import (
     SubscriptionResponse,
     TransactionResponse,
     UpdateSubscriptionPriceRequest,
+    UpdateMonthlyBudgetRequest,
 )
 
 router = APIRouter(tags=["ledger"])
@@ -91,6 +94,44 @@ def set_monthly_budget(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Yalnızca gider kategorilerine bütçe limiti eklenebilir.",
+        ) from None
+    return MonthlyBudgetResponse.from_domain(budget)
+
+
+@router.patch(
+    "/budgets/{budget_id}",
+    response_model=MonthlyBudgetResponse,
+)
+def update_monthly_budget(
+    budget_id: UUID,
+    payload: UpdateMonthlyBudgetRequest,
+    session: Annotated[Session, Depends(get_database_session)],
+    user: Annotated[User, Depends(require_permission("finance.write.self"))],
+) -> MonthlyBudgetResponse:
+    try:
+        budget = UpdateMonthlyBudget(
+            categories=SqlAlchemyCategoryRepository(session),
+            budgets=SqlAlchemyBudgetRepository(session),
+        ).execute(
+            user_id=user.id,
+            budget_id=budget_id,
+            category_id=payload.category_id,
+            limit_minor=payload.limit_as_minor(),
+        )
+    except (CategoryNotFoundError, BudgetNotFoundError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Bütçe limiti veya kategori bulunamadı.",
+        ) from None
+    except CategoryKindMismatchError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Yalnızca gider kategorilerine bütçe limiti eklenebilir.",
+        ) from None
+    except BudgetAlreadyExistsError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bu kategorinin zaten bir bütçe limiti var.",
         ) from None
     return MonthlyBudgetResponse.from_domain(budget)
 

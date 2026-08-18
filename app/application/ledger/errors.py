@@ -16,3 +16,7 @@ class SubscriptionNotFoundError(Exception):
 
 class BudgetNotFoundError(Exception):
     pass
+
+
+class BudgetAlreadyExistsError(Exception):
+    pass

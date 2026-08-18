@@ -48,3 +48,35 @@ class RemoveMonthlyBudget:
     def execute(self, user_id: UUID, category_id: UUID) -> None:
         if not self._budgets.remove(user_id, category_id):
             raise BudgetNotFoundError
+
+
+class UpdateMonthlyBudget:
+    def __init__(
+        self,
+        categories: CategoryRepository,
+        budgets: BudgetRepository,
+    ) -> None:
+        self._categories = categories
+        self._budgets = budgets
+
+    def execute(
+        self,
+        user_id: UUID,
+        budget_id: UUID,
+        category_id: UUID,
+        limit_minor: int,
+    ) -> MonthlyBudget:
+        category = self._categories.get_available_by_id(user_id, category_id)
+        if category is None:
+            raise CategoryNotFoundError
+        if category.kind != TransactionKind.EXPENSE:
+            raise CategoryKindMismatchError
+        budget = self._budgets.update(
+            user_id,
+            budget_id,
+            category,
+            limit_minor,
+        )
+        if budget is None:
+            raise BudgetNotFoundError
+        return budget

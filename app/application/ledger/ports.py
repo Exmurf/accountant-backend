@@ -96,4 +96,12 @@ class BudgetRepository(Protocol):
         limit_minor: int,
     ) -> MonthlyBudget: ...
 
+    def update(
+        self,
+        user_id: UUID,
+        budget_id: UUID,
+        category: Category,
+        limit_minor: int,
+    ) -> MonthlyBudget | None: ...
+
     def remove(self, user_id: UUID, category_id: UUID) -> bool: ...

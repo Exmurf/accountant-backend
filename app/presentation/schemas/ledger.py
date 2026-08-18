@@ -133,6 +133,10 @@ class SetMonthlyBudgetRequest(BaseModel):
         return int(self.limit * 100)
 
 
+class UpdateMonthlyBudgetRequest(SetMonthlyBudgetRequest):
+    category_id: UUID
+
+
 class MonthlyBudgetResponse(BaseModel):
     id: UUID
     category_id: UUID

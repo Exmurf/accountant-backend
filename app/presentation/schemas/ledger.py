@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 from app.domain.ledger.budget import MonthlyBudget
 from app.domain.ledger.models import (
@@ -43,14 +43,7 @@ class CreateTransactionRequest(BaseModel):
     kind: TransactionKind
     amount: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
     description: str = Field(min_length=1, max_length=200)
-    occurred_at: datetime
-
-    @field_validator("occurred_at")
-    @classmethod
-    def occurred_at_must_have_timezone(cls, value: datetime) -> datetime:
-        if value.tzinfo is None or value.utcoffset() is None:
-            raise ValueError("occurred_at must include a timezone")
-        return value
+    occurred_on: date
 
     def amount_as_minor(self) -> int:
         return int(self.amount * 100)

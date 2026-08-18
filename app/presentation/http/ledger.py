@@ -259,7 +259,11 @@ def create_transaction(
             kind=payload.kind,
             amount_minor=payload.amount_as_minor(),
             description=payload.description,
-            occurred_at=payload.occurred_at,
+            occurred_at=datetime.combine(
+                payload.occurred_on,
+                time(hour=12),
+                tzinfo=ZoneInfo(get_settings().app_timezone),
+            ),
         )
     except CategoryNotFoundError:
         raise HTTPException(

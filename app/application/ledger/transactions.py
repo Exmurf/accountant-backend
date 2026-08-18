@@ -6,7 +6,15 @@ from app.application.ledger.errors import (
     CategoryNotFoundError,
 )
 from app.application.ledger.ports import CategoryRepository, TransactionRepository
-from app.domain.ledger.models import Transaction, TransactionKind
+from app.domain.ledger.models import AccountBalance, Transaction, TransactionKind
+
+
+class GetAccountBalance:
+    def __init__(self, transactions: TransactionRepository) -> None:
+        self._transactions = transactions
+
+    def execute(self, user_id: UUID, as_of: datetime) -> AccountBalance:
+        return self._transactions.get_balance(user_id, as_of)
 
 
 class ListTransactions:

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -28,7 +28,11 @@ from app.application.ledger.subscriptions import (
     RemoveSubscription,
     UpdateSubscriptionPrice,
 )
-from app.application.ledger.transactions import CreateTransaction, ListTransactions
+from app.application.ledger.transactions import (
+    CreateTransaction,
+    GetAccountBalance,
+    ListTransactions,
+)
 from app.domain.identity.user import User
 from app.domain.ledger.models import TransactionKind
 from app.core.config import get_settings
@@ -42,6 +46,7 @@ from app.infrastructure.database.session import get_database_session
 from app.infrastructure.notifications.runtime import notify_budget_limit
 from app.presentation.dependencies.auth import require_permission
 from app.presentation.schemas.ledger import (
+    AccountBalanceResponse,
     CategoryResponse,
     CreateCategoryRequest,
     CreateTransactionRequest,
@@ -56,6 +61,18 @@ from app.presentation.schemas.ledger import (
 )
 
 router = APIRouter(tags=["ledger"])
+
+
+@router.get("/balance", response_model=AccountBalanceResponse)
+def get_account_balance(
+    session: Annotated[Session, Depends(get_database_session)],
+    user: Annotated[User, Depends(require_permission("finance.read.self"))],
+) -> AccountBalanceResponse:
+    balance = GetAccountBalance(SqlAlchemyTransactionRepository(session)).execute(
+        user.id,
+        datetime.now(UTC),
+    )
+    return AccountBalanceResponse.from_domain(balance)
 
 
 @router.get("/budgets", response_model=list[MonthlyBudgetResponse])

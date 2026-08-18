@@ -3,7 +3,12 @@ from typing import Protocol
 from uuid import UUID
 
 from app.domain.ledger.budget import MonthlyBudget
-from app.domain.ledger.models import Category, Transaction, TransactionKind
+from app.domain.ledger.models import (
+    AccountBalance,
+    Category,
+    Transaction,
+    TransactionKind,
+)
 from app.domain.ledger.subscription import Subscription
 
 
@@ -30,6 +35,8 @@ class CategoryRepository(Protocol):
 
 
 class TransactionRepository(Protocol):
+    def get_balance(self, user_id: UUID, as_of: datetime) -> AccountBalance: ...
+
     def list_for_user(
         self,
         user_id: UUID,

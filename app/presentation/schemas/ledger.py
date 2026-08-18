@@ -5,7 +5,12 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 
 from app.domain.ledger.budget import MonthlyBudget
-from app.domain.ledger.models import Category, Transaction, TransactionKind
+from app.domain.ledger.models import (
+    AccountBalance,
+    Category,
+    Transaction,
+    TransactionKind,
+)
 from app.domain.ledger.subscription import Subscription
 
 
@@ -78,6 +83,20 @@ class TransactionResponse(BaseModel):
             created_at=transaction.created_at,
             subscription_id=transaction.subscription_id,
             subscription_charge_date=transaction.subscription_charge_date,
+        )
+
+
+class AccountBalanceResponse(BaseModel):
+    current_balance_minor: int
+    total_income_minor: int
+    total_expense_minor: int
+
+    @classmethod
+    def from_domain(cls, balance: AccountBalance) -> "AccountBalanceResponse":
+        return cls(
+            current_balance_minor=balance.current_balance_minor,
+            total_income_minor=balance.total_income_minor,
+            total_expense_minor=balance.total_expense_minor,
         )
 
 

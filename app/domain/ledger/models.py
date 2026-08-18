@@ -10,6 +10,16 @@ class TransactionKind(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class AccountBalance:
+    total_income_minor: int
+    total_expense_minor: int
+
+    @property
+    def current_balance_minor(self) -> int:
+        return self.total_income_minor - self.total_expense_minor
+
+
+@dataclass(frozen=True, slots=True)
 class Category:
     id: UUID
     user_id: UUID | None

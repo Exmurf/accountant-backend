@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -10,7 +10,12 @@ from app.application.ledger.errors import (
     CategoryAlreadyExistsError,
 )
 from app.domain.ledger.budget import MonthlyBudget
-from app.domain.ledger.models import Category, Transaction, TransactionKind
+from app.domain.ledger.models import (
+    AccountBalance,
+    Category,
+    Transaction,
+    TransactionKind,
+)
 from app.domain.ledger.subscription import Subscription
 from app.infrastructure.database.models.ledger import (
     CategoryModel,
@@ -85,6 +90,45 @@ class SqlAlchemyCategoryRepository:
 class SqlAlchemyTransactionRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
+
+    def get_balance(self, user_id: UUID, as_of: datetime) -> AccountBalance:
+        total_income, total_expense = self._session.execute(
+            select(
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (
+                                TransactionModel.kind
+                                == TransactionKind.INCOME.value,
+                                TransactionModel.amount_minor,
+                            ),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (
+                                TransactionModel.kind
+                                == TransactionKind.EXPENSE.value,
+                                TransactionModel.amount_minor,
+                            ),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ),
+            ).where(
+                TransactionModel.user_id == user_id,
+                TransactionModel.occurred_at <= as_of,
+            )
+        ).one()
+        return AccountBalance(
+            total_income_minor=int(total_income),
+            total_expense_minor=int(total_expense),
+        )
 
     def list_for_user(
         self,

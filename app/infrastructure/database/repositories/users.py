@@ -13,6 +13,14 @@ class SqlAlchemyUserRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
+    def list_active(self) -> list[User]:
+        models = self._session.scalars(
+            self._user_query()
+            .where(UserModel.is_active.is_(True))
+            .order_by(UserModel.email)
+        ).all()
+        return [self._to_domain(model) for model in models]
+
     def get_by_email(self, email: str) -> User | None:
         model = self._session.scalar(self._user_query().where(UserModel.email == email))
         return self._to_domain(model) if model is not None else None

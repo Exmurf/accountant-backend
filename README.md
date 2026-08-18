@@ -46,3 +46,21 @@ Git; create it from `.env.example` for a fresh checkout. The
 backend Docker Compose passes the same settings through container environment
 variables. The frontend is a separate repository and is not required to build
 or start this project.
+
+## Gmail notifications
+
+Accountant sends mail directly through Gmail SMTP; no additional mail service
+is required. Create a Google App Password for the sender account and add these
+values to the local `.env` file:
+
+```env
+MAIL_USERNAME=sender@gmail.com
+MAIL_APP_PASSWORD=your_16_character_app_password
+DAILY_SUMMARY_HOUR=21
+DAILY_SUMMARY_MINUTE=0
+```
+
+Do not use or share the Gmail account's normal password. `.env` is ignored by
+Git. When both mail values are present, the API sends one expense summary per
+active user after the configured local time and one warning when a category
+first exceeds its monthly limit. Example-domain accounts are skipped.

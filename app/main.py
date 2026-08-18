@@ -1,8 +1,26 @@
+import asyncio
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.presentation.http.router import api_router
+from app.infrastructure.notifications.runtime import (
+    notification_scheduler,
+    stop_scheduler,
+)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    settings = get_settings()
+    scheduler_task: asyncio.Task[None] | None = None
+    if settings.mail_enabled:
+        scheduler_task = asyncio.create_task(notification_scheduler())
+    yield
+    if scheduler_task is not None:
+        await stop_scheduler(scheduler_task)
 
 
 def create_app() -> FastAPI:
@@ -13,6 +31,7 @@ def create_app() -> FastAPI:
         version="0.4.0",
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
+        lifespan=lifespan,
     )
 
     application.add_middleware(

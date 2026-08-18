@@ -3,7 +3,7 @@ from typing import Annotated
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.application.ledger.categories import CreateCategory, ListCategories
@@ -39,6 +39,7 @@ from app.infrastructure.database.repositories.ledger import (
     SqlAlchemyTransactionRepository,
 )
 from app.infrastructure.database.session import get_database_session
+from app.infrastructure.notifications.runtime import notify_budget_limit
 from app.presentation.dependencies.auth import require_permission
 from app.presentation.schemas.ledger import (
     CategoryResponse,
@@ -73,6 +74,7 @@ def list_monthly_budgets(
 def set_monthly_budget(
     category_id: UUID,
     payload: SetMonthlyBudgetRequest,
+    background_tasks: BackgroundTasks,
     session: Annotated[Session, Depends(get_database_session)],
     user: Annotated[User, Depends(require_permission("finance.write.self"))],
 ) -> MonthlyBudgetResponse:
@@ -95,6 +97,7 @@ def set_monthly_budget(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Yalnızca gider kategorilerine bütçe limiti eklenebilir.",
         ) from None
+    background_tasks.add_task(notify_budget_limit, user.id, budget.category_id)
     return MonthlyBudgetResponse.from_domain(budget)
 
 
@@ -105,6 +108,7 @@ def set_monthly_budget(
 def update_monthly_budget(
     budget_id: UUID,
     payload: UpdateMonthlyBudgetRequest,
+    background_tasks: BackgroundTasks,
     session: Annotated[Session, Depends(get_database_session)],
     user: Annotated[User, Depends(require_permission("finance.write.self"))],
 ) -> MonthlyBudgetResponse:
@@ -133,6 +137,7 @@ def update_monthly_budget(
             status_code=status.HTTP_409_CONFLICT,
             detail="Bu kategorinin zaten bir bütçe limiti var.",
         ) from None
+    background_tasks.add_task(notify_budget_limit, user.id, budget.category_id)
     return MonthlyBudgetResponse.from_domain(budget)
 
 
@@ -222,6 +227,7 @@ def list_transactions(
 )
 def create_transaction(
     payload: CreateTransactionRequest,
+    background_tasks: BackgroundTasks,
     session: Annotated[Session, Depends(get_database_session)],
     user: Annotated[User, Depends(require_permission("finance.write.self"))],
 ) -> TransactionResponse:
@@ -246,6 +252,12 @@ def create_transaction(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Kategori ile hareket türü uyuşmuyor.",
         ) from None
+    if transaction.kind == TransactionKind.EXPENSE:
+        background_tasks.add_task(
+            notify_budget_limit,
+            user.id,
+            transaction.category_id,
+        )
     return TransactionResponse.from_domain(transaction)
 
 
@@ -270,6 +282,7 @@ def list_subscriptions(
 )
 def create_subscription(
     payload: CreateSubscriptionRequest,
+    background_tasks: BackgroundTasks,
     session: Annotated[Session, Depends(get_database_session)],
     user: Annotated[User, Depends(require_permission("finance.write.self"))],
 ) -> SubscriptionResponse:
@@ -294,6 +307,11 @@ def create_subscription(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Abonelik yalnızca gider kategorisine bağlanabilir.",
         ) from None
+    background_tasks.add_task(
+        notify_budget_limit,
+        user.id,
+        subscription.category_id,
+    )
     return SubscriptionResponse.from_domain(subscription)
 
 
@@ -323,6 +341,7 @@ def remove_subscription(
 def update_subscription_price(
     subscription_id: UUID,
     payload: UpdateSubscriptionPriceRequest,
+    background_tasks: BackgroundTasks,
     session: Annotated[Session, Depends(get_database_session)],
     user: Annotated[User, Depends(require_permission("finance.write.self"))],
 ) -> SubscriptionResponse:
@@ -339,6 +358,11 @@ def update_subscription_price(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Abonelik bulunamadı.",
         ) from None
+    background_tasks.add_task(
+        notify_budget_limit,
+        user.id,
+        subscription.category_id,
+    )
     return SubscriptionResponse.from_domain(subscription)
 
 
@@ -347,6 +371,7 @@ def update_subscription_price(
     response_model=list[TransactionResponse],
 )
 def process_due_subscriptions(
+    background_tasks: BackgroundTasks,
     session: Annotated[Session, Depends(get_database_session)],
     user: Annotated[User, Depends(require_permission("finance.write.self"))],
 ) -> list[TransactionResponse]:
@@ -355,6 +380,8 @@ def process_due_subscriptions(
         subscriptions=SqlAlchemySubscriptionRepository(session),
         transactions=SqlAlchemyTransactionRepository(session),
     ).execute(user.id, today)
+    for category_id in {transaction.category_id for transaction in transactions}:
+        background_tasks.add_task(notify_budget_limit, user.id, category_id)
     return [
         TransactionResponse.from_domain(transaction) for transaction in transactions
     ]

@@ -71,6 +71,26 @@ class RemoveSubscription:
             raise SubscriptionNotFoundError
 
 
+class UpdateSubscriptionPrice:
+    def __init__(self, subscriptions: SubscriptionRepository) -> None:
+        self._subscriptions = subscriptions
+
+    def execute(
+        self,
+        user_id: UUID,
+        subscription_id: UUID,
+        amount_minor: int,
+    ) -> Subscription:
+        subscription = self._subscriptions.update_amount(
+            user_id,
+            subscription_id,
+            amount_minor,
+        )
+        if subscription is None:
+            raise SubscriptionNotFoundError
+        return subscription
+
+
 class ProcessDueSubscriptions:
     def __init__(
         self,

@@ -90,6 +90,13 @@ class CreateSubscriptionRequest(BaseModel):
         return int(self.amount * 100)
 
 
+class UpdateSubscriptionPriceRequest(BaseModel):
+    amount: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
+
+    def amount_as_minor(self) -> int:
+        return int(self.amount * 100)
+
+
 class SubscriptionResponse(BaseModel):
     id: UUID
     category_id: UUID

@@ -239,6 +239,25 @@ class SqlAlchemySubscriptionRepository:
             model.next_charge_date = next_charge_date
             self._session.commit()
 
+    def update_amount(
+        self,
+        user_id: UUID,
+        subscription_id: UUID,
+        amount_minor: int,
+    ) -> Subscription | None:
+        model = self._session.scalar(
+            self._subscription_query().where(
+                SubscriptionModel.id == subscription_id,
+                SubscriptionModel.user_id == user_id,
+                SubscriptionModel.is_active.is_(True),
+            )
+        )
+        if model is None:
+            return None
+        model.amount_minor = amount_minor
+        self._session.commit()
+        return self._subscription_to_domain(model)
+
     def deactivate(self, user_id: UUID, subscription_id: UUID) -> bool:
         model = self._session.scalar(
             select(SubscriptionModel).where(

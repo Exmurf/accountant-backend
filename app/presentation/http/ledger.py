@@ -18,6 +18,7 @@ from app.application.ledger.subscriptions import (
     ListSubscriptions,
     ProcessDueSubscriptions,
     RemoveSubscription,
+    UpdateSubscriptionPrice,
 )
 from app.application.ledger.transactions import CreateTransaction, ListTransactions
 from app.domain.identity.user import User
@@ -38,6 +39,7 @@ from app.presentation.schemas.ledger import (
     SuccessResponse,
     SubscriptionResponse,
     TransactionResponse,
+    UpdateSubscriptionPriceRequest,
 )
 
 router = APIRouter(tags=["ledger"])
@@ -202,6 +204,32 @@ def remove_subscription(
             detail="Abonelik bulunamadı.",
         ) from None
     return SuccessResponse()
+
+
+@router.patch(
+    "/subscriptions/{subscription_id}/price",
+    response_model=SubscriptionResponse,
+)
+def update_subscription_price(
+    subscription_id: UUID,
+    payload: UpdateSubscriptionPriceRequest,
+    session: Annotated[Session, Depends(get_database_session)],
+    user: Annotated[User, Depends(require_permission("finance.write.self"))],
+) -> SubscriptionResponse:
+    try:
+        subscription = UpdateSubscriptionPrice(
+            SqlAlchemySubscriptionRepository(session)
+        ).execute(
+            user_id=user.id,
+            subscription_id=subscription_id,
+            amount_minor=payload.amount_as_minor(),
+        )
+    except SubscriptionNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Abonelik bulunamadı.",
+        ) from None
+    return SubscriptionResponse.from_domain(subscription)
 
 
 @router.post(

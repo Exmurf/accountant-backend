@@ -13,8 +13,8 @@ class GetAccountBalance:
     def __init__(self, transactions: TransactionRepository) -> None:
         self._transactions = transactions
 
-    def execute(self, user_id: UUID, as_of: datetime) -> AccountBalance:
-        return self._transactions.get_balance(user_id, as_of)
+    def execute(self, user_id: UUID, before: datetime) -> AccountBalance:
+        return self._transactions.get_balance(user_id, before)
 
 
 class ListTransactions:

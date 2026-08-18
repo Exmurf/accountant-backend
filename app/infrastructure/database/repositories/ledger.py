@@ -91,7 +91,7 @@ class SqlAlchemyTransactionRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def get_balance(self, user_id: UUID, as_of: datetime) -> AccountBalance:
+    def get_balance(self, user_id: UUID, before: datetime) -> AccountBalance:
         total_income, total_expense = self._session.execute(
             select(
                 func.coalesce(
@@ -122,7 +122,7 @@ class SqlAlchemyTransactionRepository:
                 ),
             ).where(
                 TransactionModel.user_id == user_id,
-                TransactionModel.occurred_at <= as_of,
+                TransactionModel.occurred_at < before,
             )
         ).one()
         return AccountBalance(

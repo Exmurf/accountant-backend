@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime, time, timedelta
 from typing import Annotated
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -68,9 +68,11 @@ def get_account_balance(
     session: Annotated[Session, Depends(get_database_session)],
     user: Annotated[User, Depends(require_permission("finance.read.self"))],
 ) -> AccountBalanceResponse:
+    timezone = ZoneInfo(get_settings().app_timezone)
+    tomorrow = datetime.now(timezone).date() + timedelta(days=1)
     balance = GetAccountBalance(SqlAlchemyTransactionRepository(session)).execute(
         user.id,
-        datetime.now(UTC),
+        datetime.combine(tomorrow, time.min, tzinfo=timezone),
     )
     return AccountBalanceResponse.from_domain(balance)
 

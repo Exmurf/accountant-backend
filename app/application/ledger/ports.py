@@ -35,7 +35,7 @@ class CategoryRepository(Protocol):
 
 
 class TransactionRepository(Protocol):
-    def get_balance(self, user_id: UUID, as_of: datetime) -> AccountBalance: ...
+    def get_balance(self, user_id: UUID, before: datetime) -> AccountBalance: ...
 
     def list_for_user(
         self,

@@ -8,6 +8,7 @@ from app.infrastructure.database.base import Base
 from app.infrastructure.database.models import identity  # noqa: F401
 from app.infrastructure.database.models import ledger  # noqa: F401
 from app.infrastructure.database.models import notifications  # noqa: F401
+from app.infrastructure.database.models import savings  # noqa: F401
 
 config = context.config
 

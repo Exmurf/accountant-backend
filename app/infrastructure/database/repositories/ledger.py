@@ -135,8 +135,10 @@ class SqlAlchemyTransactionRepository:
         user_id: UUID,
         start: datetime,
         end: datetime,
+        category_id: UUID | None = None,
+        kind: TransactionKind | None = None,
     ) -> list[Transaction]:
-        models = self._session.scalars(
+        query = (
             select(TransactionModel)
             .options(joinedload(TransactionModel.category))
             .where(
@@ -144,7 +146,13 @@ class SqlAlchemyTransactionRepository:
                 TransactionModel.occurred_at >= start,
                 TransactionModel.occurred_at < end,
             )
-            .order_by(TransactionModel.occurred_at.desc())
+        )
+        if category_id is not None:
+            query = query.where(TransactionModel.category_id == category_id)
+        if kind is not None:
+            query = query.where(TransactionModel.kind == kind.value)
+        models = self._session.scalars(
+            query.order_by(TransactionModel.occurred_at.desc())
         ).all()
         return [self._transaction_to_domain(model) for model in models]
 
@@ -171,6 +179,48 @@ class SqlAlchemyTransactionRepository:
         self._session.commit()
         model.category = self._session.get(CategoryModel, category.id)
         return self._transaction_to_domain(model)
+
+    def update(
+        self,
+        user_id: UUID,
+        transaction_id: UUID,
+        category: Category,
+        kind: TransactionKind,
+        amount_minor: int,
+        description: str,
+        occurred_at: datetime,
+    ) -> Transaction | None:
+        model = self._session.scalar(
+            select(TransactionModel).where(
+                TransactionModel.id == transaction_id,
+                TransactionModel.user_id == user_id,
+            )
+        )
+        if model is None:
+            return None
+
+        model.category_id = category.id
+        model.kind = kind.value
+        model.amount_minor = amount_minor
+        model.description = description
+        model.occurred_at = occurred_at
+        self._session.commit()
+        model.category = self._session.get(CategoryModel, category.id)
+        return self._transaction_to_domain(model)
+
+    def remove(self, user_id: UUID, transaction_id: UUID) -> bool:
+        model = self._session.scalar(
+            select(TransactionModel).where(
+                TransactionModel.id == transaction_id,
+                TransactionModel.user_id == user_id,
+            )
+        )
+        if model is None:
+            return False
+
+        self._session.delete(model)
+        self._session.commit()
+        return True
 
     def add_subscription_charge(
         self,

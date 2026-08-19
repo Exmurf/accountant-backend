@@ -11,10 +11,15 @@ class UserFinanceTotals:
     total_income_minor: int
     total_expense_minor: int
     transaction_count: int
+    opening_balance_minor: int = 0
 
     @property
     def current_balance_minor(self) -> int:
-        return self.total_income_minor - self.total_expense_minor
+        return (
+            self.opening_balance_minor
+            + self.total_income_minor
+            - self.total_expense_minor
+        )
 
 
 @dataclass(frozen=True, slots=True)

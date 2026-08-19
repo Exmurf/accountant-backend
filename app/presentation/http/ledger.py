@@ -20,6 +20,7 @@ from app.application.ledger.errors import (
     CategoryKindMismatchError,
     CategoryNotFoundError,
     SubscriptionNotFoundError,
+    TransactionNotFoundError,
 )
 from app.application.ledger.subscriptions import (
     CreateSubscription,
@@ -30,8 +31,11 @@ from app.application.ledger.subscriptions import (
 )
 from app.application.ledger.transactions import (
     CreateTransaction,
+    DeleteTransaction,
     GetAccountBalance,
     ListTransactions,
+    SetOpeningBalance,
+    UpdateTransaction,
 )
 from app.domain.identity.user import User
 from app.domain.ledger.models import TransactionKind
@@ -42,6 +46,7 @@ from app.infrastructure.database.repositories.ledger import (
     SqlAlchemySubscriptionRepository,
     SqlAlchemyTransactionRepository,
 )
+from app.infrastructure.database.repositories.users import SqlAlchemyUserRepository
 from app.infrastructure.database.session import get_database_session
 from app.infrastructure.notifications.runtime import notify_budget_limit
 from app.presentation.dependencies.auth import require_permission
@@ -56,8 +61,10 @@ from app.presentation.schemas.ledger import (
     SuccessResponse,
     SubscriptionResponse,
     TransactionResponse,
+    UpdateOpeningBalanceRequest,
     UpdateSubscriptionPriceRequest,
     UpdateMonthlyBudgetRequest,
+    UpdateTransactionRequest,
 )
 
 router = APIRouter(tags=["ledger"])
@@ -71,8 +78,27 @@ def get_account_balance(
     timezone = ZoneInfo(get_settings().app_timezone)
     tomorrow = datetime.now(timezone).date() + timedelta(days=1)
     balance = GetAccountBalance(SqlAlchemyTransactionRepository(session)).execute(
-        user.id,
+        user,
         datetime.combine(tomorrow, time.min, tzinfo=timezone),
+    )
+    return AccountBalanceResponse.from_domain(balance)
+
+
+@router.put("/balance/opening", response_model=AccountBalanceResponse)
+def set_opening_balance(
+    payload: UpdateOpeningBalanceRequest,
+    session: Annotated[Session, Depends(get_database_session)],
+    user: Annotated[User, Depends(require_permission("finance.write.self"))],
+) -> AccountBalanceResponse:
+    timezone = ZoneInfo(get_settings().app_timezone)
+    tomorrow = datetime.now(timezone).date() + timedelta(days=1)
+    balance = SetOpeningBalance(
+        users=SqlAlchemyUserRepository(session),
+        transactions=SqlAlchemyTransactionRepository(session),
+    ).execute(
+        user_id=user.id,
+        amount_minor=payload.amount_as_minor(),
+        before=datetime.combine(tomorrow, time.min, tzinfo=timezone),
     )
     return AccountBalanceResponse.from_domain(balance)
 
@@ -223,6 +249,8 @@ def list_transactions(
     end: Annotated[datetime, Query()],
     session: Annotated[Session, Depends(get_database_session)],
     user: Annotated[User, Depends(require_permission("finance.read.self"))],
+    category_id: Annotated[UUID | None, Query()] = None,
+    kind: Annotated[TransactionKind | None, Query()] = None,
 ) -> list[TransactionResponse]:
     if start.tzinfo is None or end.tzinfo is None or start >= end:
         raise HTTPException(
@@ -233,6 +261,8 @@ def list_transactions(
         user.id,
         start,
         end,
+        category_id=category_id,
+        kind=kind,
     )
     return [
         TransactionResponse.from_domain(transaction) for transaction in transactions
@@ -282,6 +312,73 @@ def create_transaction(
             transaction.category_id,
         )
     return TransactionResponse.from_domain(transaction)
+
+
+@router.patch("/transactions/{transaction_id}", response_model=TransactionResponse)
+def update_transaction(
+    transaction_id: UUID,
+    payload: UpdateTransactionRequest,
+    background_tasks: BackgroundTasks,
+    session: Annotated[Session, Depends(get_database_session)],
+    user: Annotated[User, Depends(require_permission("finance.write.self"))],
+) -> TransactionResponse:
+    categories = SqlAlchemyCategoryRepository(session)
+    transactions = SqlAlchemyTransactionRepository(session)
+    try:
+        transaction = UpdateTransaction(categories, transactions).execute(
+            user_id=user.id,
+            transaction_id=transaction_id,
+            category_id=payload.category_id,
+            kind=payload.kind,
+            amount_minor=payload.amount_as_minor(),
+            description=payload.description,
+            occurred_at=datetime.combine(
+                payload.occurred_on,
+                time(hour=12),
+                tzinfo=ZoneInfo(get_settings().app_timezone),
+            ),
+        )
+    except CategoryNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Kategori bulunamadı.",
+        ) from None
+    except CategoryKindMismatchError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Kategori ile hareket türü uyuşmuyor.",
+        ) from None
+    except TransactionNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Hareket bulunamadı.",
+        ) from None
+    if transaction.kind == TransactionKind.EXPENSE:
+        background_tasks.add_task(
+            notify_budget_limit,
+            user.id,
+            transaction.category_id,
+        )
+    return TransactionResponse.from_domain(transaction)
+
+
+@router.delete("/transactions/{transaction_id}", response_model=SuccessResponse)
+def delete_transaction(
+    transaction_id: UUID,
+    session: Annotated[Session, Depends(get_database_session)],
+    user: Annotated[User, Depends(require_permission("finance.write.self"))],
+) -> SuccessResponse:
+    try:
+        DeleteTransaction(SqlAlchemyTransactionRepository(session)).execute(
+            user.id,
+            transaction_id,
+        )
+    except TransactionNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Hareket bulunamadı.",
+        ) from None
+    return SuccessResponse()
 
 
 @router.get("/subscriptions", response_model=list[SubscriptionResponse])

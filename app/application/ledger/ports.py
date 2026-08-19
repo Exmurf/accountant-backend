@@ -42,6 +42,8 @@ class TransactionRepository(Protocol):
         user_id: UUID,
         start: datetime,
         end: datetime,
+        category_id: UUID | None = None,
+        kind: TransactionKind | None = None,
     ) -> list[Transaction]: ...
 
     def add(
@@ -54,12 +56,29 @@ class TransactionRepository(Protocol):
         occurred_at: datetime,
     ) -> Transaction: ...
 
+    def update(
+        self,
+        user_id: UUID,
+        transaction_id: UUID,
+        category: Category,
+        kind: TransactionKind,
+        amount_minor: int,
+        description: str,
+        occurred_at: datetime,
+    ) -> Transaction | None: ...
+
+    def remove(self, user_id: UUID, transaction_id: UUID) -> bool: ...
+
     def add_subscription_charge(
         self,
         subscription: Subscription,
         charge_date: date,
         occurred_at: datetime,
     ) -> Transaction | None: ...
+
+
+class OpeningBalanceRepository(Protocol):
+    def set_opening_balance(self, user_id: UUID, amount_minor: int) -> int | None: ...
 
 
 class SubscriptionRepository(Protocol):

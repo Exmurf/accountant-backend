@@ -2,6 +2,7 @@ from datetime import datetime, time
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Column,
     DateTime,
@@ -65,6 +66,11 @@ class UserModel(Base):
     display_name: Mapped[str] = mapped_column(String(100))
     password_hash: Mapped[str] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    opening_balance_minor: Mapped[int] = mapped_column(
+        BigInteger,
+        default=0,
+        server_default="0",
+    )
     daily_summary_enabled: Mapped[bool] = mapped_column(
         Boolean,
         default=True,

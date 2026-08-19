@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import datetime
 from uuid import UUID
 
@@ -33,7 +34,10 @@ class ListAdminUserSummaries:
                 is_active=user.is_active,
                 roles=tuple(sorted(user.roles)),
                 created_at=user.created_at,
-                finances=self._finances.get_totals(user.id, before),
+                finances=replace(
+                    self._finances.get_totals(user.id, before),
+                    opening_balance_minor=user.opening_balance_minor,
+                ),
             )
             for user in self._users.list_all()
         )

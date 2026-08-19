@@ -89,6 +89,15 @@ class SqlAlchemyUserRepository:
             return None
         return self._to_domain(persisted)
 
+    def set_opening_balance(self, user_id: UUID, amount_minor: int) -> int | None:
+        model = self._session.get(UserModel, user_id)
+        if model is None:
+            return None
+
+        model.opening_balance_minor = amount_minor
+        self._session.commit()
+        return model.opening_balance_minor
+
     @staticmethod
     def _user_query():  # type: ignore[no-untyped-def]
         return select(UserModel).options(
@@ -106,6 +115,7 @@ class SqlAlchemyUserRepository:
             display_name=model.display_name,
             password_hash=model.password_hash,
             is_active=model.is_active,
+            opening_balance_minor=model.opening_balance_minor,
             daily_summary_enabled=model.daily_summary_enabled,
             daily_summary_time=model.daily_summary_time,
             budget_alerts_enabled=model.budget_alerts_enabled,

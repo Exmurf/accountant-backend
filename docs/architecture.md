@@ -71,7 +71,14 @@ permissions from PostgreSQL for each protected request.
 `user_id`. Category ownership and income/expense type matching are enforced in
 the application layer, while positive minor-unit amounts and valid types are
 also protected by database constraints. List queries require an explicit time
-range and filter by the authenticated user.
+range and filter by the authenticated user; category and kind are optional
+extra filters. Posted transactions can be edited and deleted one by one, and
+an edit revalidates category ownership and kind exactly like a new record.
+
+Each user also carries a signed `opening_balance_minor`, the money held before
+the account existed. It is added to the current balance wherever a balance is
+reported, but it is not a transaction, so it never appears in a list, a monthly
+cash flow or a savings month.
 
 ## Recurring subscriptions
 

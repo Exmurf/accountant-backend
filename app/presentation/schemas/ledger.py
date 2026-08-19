@@ -49,6 +49,24 @@ class CreateTransactionRequest(BaseModel):
         return int(self.amount * 100)
 
 
+class UpdateTransactionRequest(BaseModel):
+    category_id: UUID
+    kind: TransactionKind
+    amount: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
+    description: str = Field(min_length=1, max_length=200)
+    occurred_on: date
+
+    def amount_as_minor(self) -> int:
+        return int(self.amount * 100)
+
+
+class UpdateOpeningBalanceRequest(BaseModel):
+    amount: Decimal = Field(max_digits=12, decimal_places=2)
+
+    def amount_as_minor(self) -> int:
+        return int(self.amount * 100)
+
+
 class TransactionResponse(BaseModel):
     id: UUID
     category_id: UUID
@@ -81,6 +99,7 @@ class TransactionResponse(BaseModel):
 
 class AccountBalanceResponse(BaseModel):
     current_balance_minor: int
+    opening_balance_minor: int
     total_income_minor: int
     total_expense_minor: int
 
@@ -88,6 +107,7 @@ class AccountBalanceResponse(BaseModel):
     def from_domain(cls, balance: AccountBalance) -> "AccountBalanceResponse":
         return cls(
             current_balance_minor=balance.current_balance_minor,
+            opening_balance_minor=balance.opening_balance_minor,
             total_income_minor=balance.total_income_minor,
             total_expense_minor=balance.total_expense_minor,
         )

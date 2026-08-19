@@ -10,6 +10,10 @@ class CategoryAlreadyExistsError(Exception):
     pass
 
 
+class TransactionNotFoundError(Exception):
+    pass
+
+
 class SubscriptionNotFoundError(Exception):
     pass
 

@@ -10,6 +10,7 @@ class User:
     display_name: str
     password_hash: str
     is_active: bool
+    opening_balance_minor: int
     daily_summary_enabled: bool
     daily_summary_time: time
     budget_alerts_enabled: bool

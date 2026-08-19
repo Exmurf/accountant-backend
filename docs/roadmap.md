@@ -14,7 +14,12 @@ released together with the matching backend commit.
 - [x] Highest spending category
 - [x] Upcoming payments on the overview
 - [x] Monthly income and expense chart
-- [ ] Past month selection — the overview is fixed to the current month
+- [x] Past month selection
+
+The overview walks month by month and names the month it is showing. Only the
+month list follows the picker: the balance, the six-month average and the
+budget screen stay anchored to the running month, so stepping back to read
+history cannot make today's figures look wrong.
 
 ## 2. Savings
 

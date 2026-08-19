@@ -3,7 +3,6 @@ from datetime import UTC, date, datetime, time
 from uuid import UUID
 
 from app.application.ledger.errors import (
-    CategoryKindMismatchError,
     CategoryNotFoundError,
     SubscriptionNotFoundError,
 )
@@ -51,8 +50,6 @@ class CreateSubscription:
         category = self._categories.get_available_by_id(user_id, category_id)
         if category is None:
             raise CategoryNotFoundError
-        if category.kind != TransactionKind.EXPENSE:
-            raise CategoryKindMismatchError
         return self._subscriptions.add(
             user_id=user_id,
             category=category,
@@ -71,20 +68,35 @@ class RemoveSubscription:
             raise SubscriptionNotFoundError
 
 
-class UpdateSubscriptionPrice:
-    def __init__(self, subscriptions: SubscriptionRepository) -> None:
+class UpdateSubscription:
+    def __init__(
+        self,
+        categories: CategoryRepository,
+        subscriptions: SubscriptionRepository,
+    ) -> None:
+        self._categories = categories
         self._subscriptions = subscriptions
 
     def execute(
         self,
         user_id: UUID,
         subscription_id: UUID,
+        category_id: UUID,
+        name: str,
         amount_minor: int,
+        billing_day: int,
     ) -> Subscription:
-        subscription = self._subscriptions.update_amount(
-            user_id,
-            subscription_id,
-            amount_minor,
+        category = self._categories.get_available_by_id(user_id, category_id)
+        if category is None:
+            raise CategoryNotFoundError
+
+        subscription = self._subscriptions.update(
+            user_id=user_id,
+            subscription_id=subscription_id,
+            category=category,
+            name=name.strip(),
+            amount_minor=amount_minor,
+            billing_day=billing_day,
         )
         if subscription is None:
             raise SubscriptionNotFoundError

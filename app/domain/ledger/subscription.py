@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from uuid import UUID
 
+from app.domain.ledger.models import TransactionKind
+
 
 @dataclass(frozen=True, slots=True)
 class Subscription:
@@ -10,6 +12,7 @@ class Subscription:
     category_id: UUID
     category_name: str
     category_color: str
+    kind: TransactionKind
     name: str
     amount_minor: int
     billing_day: int

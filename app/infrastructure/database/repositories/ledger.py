@@ -1,3 +1,4 @@
+from calendar import monthrange
 from datetime import date, datetime
 from uuid import UUID
 
@@ -240,7 +241,7 @@ class SqlAlchemyTransactionRepository:
         model = TransactionModel(
             user_id=subscription.user_id,
             category_id=subscription.category_id,
-            kind=TransactionKind.EXPENSE.value,
+            kind=subscription.kind.value,
             amount_minor=subscription.amount_minor,
             description=subscription.name,
             occurred_at=occurred_at,
@@ -338,11 +339,14 @@ class SqlAlchemySubscriptionRepository:
             model.next_charge_date = next_charge_date
             self._session.commit()
 
-    def update_amount(
+    def update(
         self,
         user_id: UUID,
         subscription_id: UUID,
+        category: Category,
+        name: str,
         amount_minor: int,
+        billing_day: int,
     ) -> Subscription | None:
         model = self._session.scalar(
             self._subscription_query().where(
@@ -353,8 +357,22 @@ class SqlAlchemySubscriptionRepository:
         )
         if model is None:
             return None
+
+        if billing_day != model.billing_day:
+            # The pending charge keeps its month and only moves to the new day,
+            # clamped to months that are too short for it.
+            pending = model.next_charge_date
+            last_day = monthrange(pending.year, pending.month)[1]
+            model.next_charge_date = pending.replace(
+                day=min(billing_day, last_day)
+            )
+            model.billing_day = billing_day
+
+        model.category_id = category.id
+        model.name = name
         model.amount_minor = amount_minor
         self._session.commit()
+        model.category = self._session.get(CategoryModel, category.id)
         return self._subscription_to_domain(model)
 
     def deactivate(self, user_id: UUID, subscription_id: UUID) -> bool:
@@ -385,6 +403,7 @@ class SqlAlchemySubscriptionRepository:
             category_id=model.category_id,
             category_name=model.category.name,
             category_color=model.category.color,
+            kind=TransactionKind(model.category.kind),
             name=model.name,
             amount_minor=model.amount_minor,
             billing_day=model.billing_day,

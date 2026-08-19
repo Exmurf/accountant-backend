@@ -102,11 +102,14 @@ class SubscriptionRepository(Protocol):
         next_charge_date: date,
     ) -> None: ...
 
-    def update_amount(
+    def update(
         self,
         user_id: UUID,
         subscription_id: UUID,
+        category: Category,
+        name: str,
         amount_minor: int,
+        billing_day: int,
     ) -> Subscription | None: ...
 
     def deactivate(self, user_id: UUID, subscription_id: UUID) -> bool: ...

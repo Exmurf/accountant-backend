@@ -83,14 +83,21 @@ the account existed. It is added to the current balance wherever a balance is
 reported, but it is not a transaction, so it never appears in a list, a monthly
 cash flow or a savings month.
 
-## Recurring subscriptions
+## Recurring transactions
 
-`subscriptions` stores active monthly payment definitions separately from
-posted `transactions`. Due processing catches up every unpaid month, advances
-the next charge date while preserving the original billing day, and links each
-generated expense back to its subscription. A unique
-`subscription_id + subscription_charge_date` constraint makes processing
-idempotent. Removing a subscription is a soft deactivation so historical
+`subscriptions` stores active monthly definitions separately from posted
+`transactions`. An entry is income or expense according to the category it is
+bound to rather than a column of its own, so a salary and a streaming plan use
+the same table and a category change moves future charges with it. Past
+transactions keep the kind they were posted with.
+
+Due processing catches up every unpaid month, advances the next charge date
+while preserving the billing day, and links each generated transaction back to
+its definition. A unique `subscription_id + subscription_charge_date`
+constraint makes processing idempotent, so it is safe to run repeatedly.
+Editing an entry may change its name, category, amount and billing day; a new
+billing day moves the pending charge inside its own month and is clamped for
+months too short for it. Removing an entry is a soft deactivation so historical
 transactions remain intact.
 
 ## Administration

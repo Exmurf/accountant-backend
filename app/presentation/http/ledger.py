@@ -27,7 +27,7 @@ from app.application.ledger.subscriptions import (
     ListSubscriptions,
     ProcessDueSubscriptions,
     RemoveSubscription,
-    UpdateSubscriptionPrice,
+    UpdateSubscription,
 )
 from app.application.ledger.transactions import (
     CreateTransaction,
@@ -62,7 +62,7 @@ from app.presentation.schemas.ledger import (
     SubscriptionResponse,
     TransactionResponse,
     UpdateOpeningBalanceRequest,
-    UpdateSubscriptionPriceRequest,
+    UpdateSubscriptionRequest,
     UpdateMonthlyBudgetRequest,
     UpdateTransactionRequest,
 )
@@ -422,16 +422,12 @@ def create_subscription(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Kategori bulunamadı.",
         ) from None
-    except CategoryKindMismatchError:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Abonelik yalnızca gider kategorisine bağlanabilir.",
-        ) from None
-    background_tasks.add_task(
-        notify_budget_limit,
-        user.id,
-        subscription.category_id,
-    )
+    if subscription.kind == TransactionKind.EXPENSE:
+        background_tasks.add_task(
+            notify_budget_limit,
+            user.id,
+            subscription.category_id,
+        )
     return SubscriptionResponse.from_domain(subscription)
 
 
@@ -455,34 +451,44 @@ def remove_subscription(
 
 
 @router.patch(
-    "/subscriptions/{subscription_id}/price",
+    "/subscriptions/{subscription_id}",
     response_model=SubscriptionResponse,
 )
-def update_subscription_price(
+def update_subscription(
     subscription_id: UUID,
-    payload: UpdateSubscriptionPriceRequest,
+    payload: UpdateSubscriptionRequest,
     background_tasks: BackgroundTasks,
     session: Annotated[Session, Depends(get_database_session)],
     user: Annotated[User, Depends(require_permission("finance.write.self"))],
 ) -> SubscriptionResponse:
     try:
-        subscription = UpdateSubscriptionPrice(
-            SqlAlchemySubscriptionRepository(session)
+        subscription = UpdateSubscription(
+            categories=SqlAlchemyCategoryRepository(session),
+            subscriptions=SqlAlchemySubscriptionRepository(session),
         ).execute(
             user_id=user.id,
             subscription_id=subscription_id,
+            category_id=payload.category_id,
+            name=payload.name,
             amount_minor=payload.amount_as_minor(),
+            billing_day=payload.billing_day,
         )
+    except CategoryNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Kategori bulunamadı.",
+        ) from None
     except SubscriptionNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Abonelik bulunamadı.",
         ) from None
-    background_tasks.add_task(
-        notify_budget_limit,
-        user.id,
-        subscription.category_id,
-    )
+    if subscription.kind == TransactionKind.EXPENSE:
+        background_tasks.add_task(
+            notify_budget_limit,
+            user.id,
+            subscription.category_id,
+        )
     return SubscriptionResponse.from_domain(subscription)
 
 
@@ -500,7 +506,12 @@ def process_due_subscriptions(
         subscriptions=SqlAlchemySubscriptionRepository(session),
         transactions=SqlAlchemyTransactionRepository(session),
     ).execute(user.id, today)
-    for category_id in {transaction.category_id for transaction in transactions}:
+    expense_categories = {
+        transaction.category_id
+        for transaction in transactions
+        if transaction.kind == TransactionKind.EXPENSE
+    }
+    for category_id in expense_categories:
         background_tasks.add_task(notify_budget_limit, user.id, category_id)
     return [
         TransactionResponse.from_domain(transaction) for transaction in transactions

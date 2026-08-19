@@ -123,8 +123,11 @@ class CreateSubscriptionRequest(BaseModel):
         return int(self.amount * 100)
 
 
-class UpdateSubscriptionPriceRequest(BaseModel):
+class UpdateSubscriptionRequest(BaseModel):
+    category_id: UUID
+    name: str = Field(min_length=2, max_length=120)
     amount: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
+    billing_day: int = Field(ge=1, le=31)
 
     def amount_as_minor(self) -> int:
         return int(self.amount * 100)
@@ -135,6 +138,7 @@ class SubscriptionResponse(BaseModel):
     category_id: UUID
     category_name: str
     category_color: str
+    kind: TransactionKind
     name: str
     amount_minor: int
     billing_day: int
@@ -147,6 +151,7 @@ class SubscriptionResponse(BaseModel):
             category_id=subscription.category_id,
             category_name=subscription.category_name,
             category_color=subscription.category_color,
+            kind=subscription.kind,
             name=subscription.name,
             amount_minor=subscription.amount_minor,
             billing_day=subscription.billing_day,

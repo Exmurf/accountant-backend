@@ -2,6 +2,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
+from app.domain.ledger.models import Transaction
+from app.domain.ledger.subscription import Subscription
+
 
 @dataclass(frozen=True, slots=True)
 class UserFinanceTotals:
@@ -23,3 +26,19 @@ class AdminUserSummary:
     roles: tuple[str, ...]
     created_at: datetime
     finances: UserFinanceTotals
+
+
+@dataclass(frozen=True, slots=True)
+class AdminCategorySpending:
+    category_id: UUID
+    category_name: str
+    category_color: str
+    total_expense_minor: int
+
+
+@dataclass(frozen=True, slots=True)
+class AdminUserFinanceDetails:
+    user_id: UUID
+    recent_transactions: tuple[Transaction, ...]
+    category_spending: tuple[AdminCategorySpending, ...]
+    subscriptions: tuple[Subscription, ...]

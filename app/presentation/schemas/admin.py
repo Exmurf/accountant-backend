@@ -3,7 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from app.domain.admin.models import AdminUserSummary
+from app.domain.admin.models import AdminUserFinanceDetails, AdminUserSummary
+from app.presentation.schemas.ledger import SubscriptionResponse, TransactionResponse
 
 
 class AdminUserSummaryResponse(BaseModel):
@@ -31,4 +32,44 @@ class AdminUserSummaryResponse(BaseModel):
             total_income_minor=user.finances.total_income_minor,
             total_expense_minor=user.finances.total_expense_minor,
             transaction_count=user.finances.transaction_count,
+        )
+
+
+class AdminCategorySpendingResponse(BaseModel):
+    category_id: UUID
+    category_name: str
+    category_color: str
+    total_expense_minor: int
+
+
+class AdminUserFinanceDetailsResponse(BaseModel):
+    user_id: UUID
+    recent_transactions: list[TransactionResponse]
+    category_spending: list[AdminCategorySpendingResponse]
+    subscriptions: list[SubscriptionResponse]
+
+    @classmethod
+    def from_domain(
+        cls,
+        details: AdminUserFinanceDetails,
+    ) -> "AdminUserFinanceDetailsResponse":
+        return cls(
+            user_id=details.user_id,
+            recent_transactions=[
+                TransactionResponse.from_domain(transaction)
+                for transaction in details.recent_transactions
+            ],
+            category_spending=[
+                AdminCategorySpendingResponse(
+                    category_id=category.category_id,
+                    category_name=category.category_name,
+                    category_color=category.category_color,
+                    total_expense_minor=category.total_expense_minor,
+                )
+                for category in details.category_spending
+            ],
+            subscriptions=[
+                SubscriptionResponse.from_domain(subscription)
+                for subscription in details.subscriptions
+            ],
         )

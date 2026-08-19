@@ -100,6 +100,12 @@ billing day moves the pending charge inside its own month and is clamped for
 months too short for it. Removing an entry is a soft deactivation so historical
 transactions remain intact.
 
+Due processing runs on a scheduler inside the application rather than waiting
+for someone to open the app, so a balance is correct after a month away. It
+sweeps every active user hourly and on start; a user who does open the app
+still triggers the same processing for an immediate result. Because processing
+is idempotent, the two paths cannot double-charge each other.
+
 ## Administration
 
 Administration reuses the identity and ledger tables instead of owning storage.

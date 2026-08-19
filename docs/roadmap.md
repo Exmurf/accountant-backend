@@ -42,13 +42,17 @@ flow so it never counts as income in a savings month.
 
 ## 4. Recurring transactions
 
-- [ ] Recurring income such as a salary — subscriptions reject non-expense
-      categories today
-- [ ] Processing subscriptions in the background, without the app being opened;
-      due charges are currently posted by `POST /subscriptions/process-due`,
-      which the frontend calls
-- [ ] Editing a subscription's name, category and billing day — only
-      `PATCH /subscriptions/{id}/price` exists
+- [x] Recurring income such as a salary
+- [x] Processing recurring charges in the background, without the app being
+      opened
+- [x] Editing a recurring entry's name, category, amount and billing day
+
+An entry's kind comes from its category, so no column or migration was needed
+and re-pointing an entry at an income category turns its future charges into
+income. A scheduler in the application sweeps every active user hourly and on
+start, next to the existing `POST /subscriptions/process-due` the frontend
+calls for an immediate result; both go through the same idempotent path.
+`PATCH /subscriptions/{id}` replaced the price-only endpoint.
 
 ## 5. Administration
 

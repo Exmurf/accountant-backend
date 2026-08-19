@@ -50,6 +50,9 @@ Identity is persisted in `users`, `roles`, `permissions`, `user_roles`,
 `finance.write.self` permissions. The `ADMIN` role additionally receives
 `finance.read.any`, `users.read` and `users.manage`.
 
+Registration only ever grants the `USER` role, and no endpoint hands out
+`ADMIN`; that role is assigned directly in the database.
+
 Passwords are hashed with Argon2. Authentication uses a 15-minute signed access
 JWT and a 30-day opaque refresh token stored in separate HTTP-only, same-site
 cookies so browser JavaScript cannot read either token. Refresh tokens rotate on
@@ -89,6 +92,18 @@ generated expense back to its subscription. A unique
 `subscription_id + subscription_charge_date` constraint makes processing
 idempotent. Removing a subscription is a soft deactivation so historical
 transactions remain intact.
+
+## Administration
+
+Administration reuses the identity and ledger tables instead of owning storage.
+Read endpoints require both `users.read` and `finance.read.any` and stay
+read-only: an administrator sees another user's totals, recent transactions,
+category spending and active subscriptions but cannot change their records.
+
+The single write is switching a user active or inactive, which requires
+`users.manage` and is guarded in the application layer so an administrator
+cannot deactivate their own account. Role changes are deliberately not exposed,
+so the panel can never widen anyone's access.
 
 ## Notifications
 

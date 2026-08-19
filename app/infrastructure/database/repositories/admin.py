@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import case, func, select
-from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy.orm import Session, joinedload
 
 from app.domain.admin.models import AdminCategorySpending, UserFinanceTotals
 from app.domain.identity.user import User
@@ -13,7 +13,7 @@ from app.infrastructure.database.models.ledger import (
     SubscriptionModel,
     TransactionModel,
 )
-from app.infrastructure.database.models.identity import RoleModel, UserModel
+from app.infrastructure.database.models.identity import UserModel
 from app.infrastructure.database.repositories.users import SqlAlchemyUserRepository
 
 
@@ -164,38 +164,5 @@ class SqlAlchemyAdminUserManager:
         if model is None:
             return None
         model.is_active = is_active
-        self._session.commit()
-        return SqlAlchemyUserRepository(self._session).get_by_id(user_id)
-
-    def set_admin_role(
-        self,
-        user_id: UUID,
-        is_admin: bool,
-    ) -> User | None:
-        model = self._session.scalar(
-            select(UserModel)
-            .options(selectinload(UserModel.roles))
-            .where(UserModel.id == user_id)
-        )
-        if model is None:
-            return None
-
-        roles_by_name = {
-            role.name: role
-            for role in self._session.scalars(
-                select(RoleModel).where(RoleModel.name.in_(("USER", "ADMIN")))
-            ).all()
-        }
-        user_role = roles_by_name.get("USER")
-        admin_role = roles_by_name.get("ADMIN")
-        if user_role is None or admin_role is None:
-            raise RuntimeError("Required roles have not been seeded")
-
-        next_roles = [role for role in model.roles if role.name != "ADMIN"]
-        if all(role.name != "USER" for role in next_roles):
-            next_roles.append(user_role)
-        if is_admin:
-            next_roles.append(admin_role)
-        model.roles = next_roles
         self._session.commit()
         return SqlAlchemyUserRepository(self._session).get_by_id(user_id)

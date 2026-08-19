@@ -4,7 +4,3 @@ class AdminUserNotFoundError(Exception):
 
 class CannotDeactivateSelfError(Exception):
     pass
-
-
-class CannotRemoveOwnAdminRoleError(Exception):
-    pass

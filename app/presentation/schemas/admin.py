@@ -80,10 +80,6 @@ class ChangeAdminUserStatusRequest(BaseModel):
     is_active: bool
 
 
-class ChangeAdminUserRoleRequest(BaseModel):
-    is_admin: bool
-
-
 class AdminUserAccessResponse(BaseModel):
     id: UUID
     is_active: bool

@@ -9,10 +9,8 @@ from sqlalchemy.orm import Session
 from app.application.admin.errors import (
     AdminUserNotFoundError,
     CannotDeactivateSelfError,
-    CannotRemoveOwnAdminRoleError,
 )
 from app.application.admin.services import (
-    ChangeAdminUserRole,
     ChangeAdminUserStatus,
     GetAdminUserFinanceDetails,
     ListAdminUserSummaries,
@@ -30,7 +28,6 @@ from app.presentation.schemas.admin import (
     AdminUserAccessResponse,
     AdminUserFinanceDetailsResponse,
     AdminUserSummaryResponse,
-    ChangeAdminUserRoleRequest,
     ChangeAdminUserStatusRequest,
 )
 
@@ -109,34 +106,5 @@ def change_user_status(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Kendi hesabını pasife alamazsın.",
-        ) from None
-    return AdminUserAccessResponse.from_user(user)
-
-
-@router.patch(
-    "/users/{user_id}/role",
-    response_model=AdminUserAccessResponse,
-)
-def change_user_role(
-    user_id: UUID,
-    payload: ChangeAdminUserRoleRequest,
-    session: Annotated[Session, Depends(get_database_session)],
-    actor: Annotated[User, Depends(require_permissions("users.manage"))],
-) -> AdminUserAccessResponse:
-    try:
-        user = ChangeAdminUserRole(SqlAlchemyAdminUserManager(session)).execute(
-            actor_id=actor.id,
-            target_user_id=user_id,
-            is_admin=payload.is_admin,
-        )
-    except AdminUserNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Kullanıcı bulunamadı.",
-        ) from None
-    except CannotRemoveOwnAdminRoleError:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Kendi admin yetkini kaldıramazsın.",
         ) from None
     return AdminUserAccessResponse.from_user(user)

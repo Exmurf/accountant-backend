@@ -22,6 +22,12 @@ class SqlAlchemyUserRepository:
         ).all()
         return [self._to_domain(model) for model in models]
 
+    def list_all(self) -> list[User]:
+        models = self._session.scalars(
+            self._user_query().order_by(UserModel.created_at.desc())
+        ).all()
+        return [self._to_domain(model) for model in models]
+
     def get_by_email(self, email: str) -> User | None:
         model = self._session.scalar(self._user_query().where(UserModel.email == email))
         return self._to_domain(model) if model is not None else None

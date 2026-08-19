@@ -49,3 +49,15 @@ def require_permission(permission: str) -> Callable[..., User]:
         return user
 
     return dependency
+
+
+def require_permissions(*permissions: str) -> Callable[..., User]:
+    def dependency(user: Annotated[User, Depends(get_current_user)]) -> User:
+        if not set(permissions).issubset(user.permissions):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bu işlem için yetkiniz yok.",
+            )
+        return user
+
+    return dependency

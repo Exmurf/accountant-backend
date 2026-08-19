@@ -26,6 +26,40 @@ from app.infrastructure.database.models.ledger import (
 )
 
 
+def to_transaction_domain(model: TransactionModel) -> Transaction:
+    return Transaction(
+        id=model.id,
+        user_id=model.user_id,
+        category_id=model.category_id,
+        category_name=model.category.name,
+        category_color=model.category.color,
+        kind=TransactionKind(model.kind),
+        amount_minor=model.amount_minor,
+        description=model.description,
+        occurred_at=model.occurred_at,
+        created_at=model.created_at,
+        subscription_id=model.subscription_id,
+        subscription_charge_date=model.subscription_charge_date,
+    )
+
+
+def to_subscription_domain(model: SubscriptionModel) -> Subscription:
+    return Subscription(
+        id=model.id,
+        user_id=model.user_id,
+        category_id=model.category_id,
+        category_name=model.category.name,
+        category_color=model.category.color,
+        kind=TransactionKind(model.category.kind),
+        name=model.name,
+        amount_minor=model.amount_minor,
+        billing_day=model.billing_day,
+        next_charge_date=model.next_charge_date,
+        is_active=model.is_active,
+        created_at=model.created_at,
+    )
+
+
 class SqlAlchemyCategoryRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -155,7 +189,7 @@ class SqlAlchemyTransactionRepository:
         models = self._session.scalars(
             query.order_by(TransactionModel.occurred_at.desc())
         ).all()
-        return [self._transaction_to_domain(model) for model in models]
+        return [to_transaction_domain(model) for model in models]
 
     def add(
         self,
@@ -179,7 +213,7 @@ class SqlAlchemyTransactionRepository:
         self._session.add(model)
         self._session.commit()
         model.category = self._session.get(CategoryModel, category.id)
-        return self._transaction_to_domain(model)
+        return to_transaction_domain(model)
 
     def update(
         self,
@@ -207,7 +241,7 @@ class SqlAlchemyTransactionRepository:
         model.occurred_at = occurred_at
         self._session.commit()
         model.category = self._session.get(CategoryModel, category.id)
-        return self._transaction_to_domain(model)
+        return to_transaction_domain(model)
 
     def remove(self, user_id: UUID, transaction_id: UUID) -> bool:
         model = self._session.scalar(
@@ -255,25 +289,7 @@ class SqlAlchemyTransactionRepository:
             self._session.rollback()
             return None
         model.category = self._session.get(CategoryModel, subscription.category_id)
-        return self._transaction_to_domain(model)
-
-    @staticmethod
-    def _transaction_to_domain(model: TransactionModel) -> Transaction:
-        return Transaction(
-            id=model.id,
-            user_id=model.user_id,
-            category_id=model.category_id,
-            category_name=model.category.name,
-            category_color=model.category.color,
-            kind=TransactionKind(model.kind),
-            amount_minor=model.amount_minor,
-            description=model.description,
-            occurred_at=model.occurred_at,
-            created_at=model.created_at,
-            subscription_id=model.subscription_id,
-            subscription_charge_date=model.subscription_charge_date,
-        )
-
+        return to_transaction_domain(model)
 
 class SqlAlchemySubscriptionRepository:
     def __init__(self, session: Session) -> None:
@@ -288,7 +304,7 @@ class SqlAlchemySubscriptionRepository:
             )
             .order_by(SubscriptionModel.next_charge_date, SubscriptionModel.name)
         ).all()
-        return [self._subscription_to_domain(model) for model in models]
+        return [to_subscription_domain(model) for model in models]
 
     def list_due(self, user_id: UUID, through_date: date) -> list[Subscription]:
         models = self._session.scalars(
@@ -300,7 +316,7 @@ class SqlAlchemySubscriptionRepository:
             )
             .with_for_update()
         ).all()
-        return [self._subscription_to_domain(model) for model in models]
+        return [to_subscription_domain(model) for model in models]
 
     def add(
         self,
@@ -321,7 +337,7 @@ class SqlAlchemySubscriptionRepository:
         self._session.add(model)
         self._session.commit()
         model.category = self._session.get(CategoryModel, category.id)
-        return self._subscription_to_domain(model)
+        return to_subscription_domain(model)
 
     def update_next_charge(
         self,
@@ -373,7 +389,7 @@ class SqlAlchemySubscriptionRepository:
         model.amount_minor = amount_minor
         self._session.commit()
         model.category = self._session.get(CategoryModel, category.id)
-        return self._subscription_to_domain(model)
+        return to_subscription_domain(model)
 
     def deactivate(self, user_id: UUID, subscription_id: UUID) -> bool:
         model = self._session.scalar(
@@ -394,24 +410,6 @@ class SqlAlchemySubscriptionRepository:
         return select(SubscriptionModel).options(
             selectinload(SubscriptionModel.category)
         )
-
-    @staticmethod
-    def _subscription_to_domain(model: SubscriptionModel) -> Subscription:
-        return Subscription(
-            id=model.id,
-            user_id=model.user_id,
-            category_id=model.category_id,
-            category_name=model.category.name,
-            category_color=model.category.color,
-            kind=TransactionKind(model.category.kind),
-            name=model.name,
-            amount_minor=model.amount_minor,
-            billing_day=model.billing_day,
-            next_charge_date=model.next_charge_date,
-            is_active=model.is_active,
-            created_at=model.created_at,
-        )
-
 
 class SqlAlchemyBudgetRepository:
     def __init__(self, session: Session) -> None:

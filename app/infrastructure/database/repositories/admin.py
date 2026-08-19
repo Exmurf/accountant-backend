@@ -13,6 +13,10 @@ from app.infrastructure.database.models.ledger import (
     SubscriptionModel,
     TransactionModel,
 )
+from app.infrastructure.database.repositories.ledger import (
+    to_subscription_domain,
+    to_transaction_domain,
+)
 from app.infrastructure.database.models.identity import UserModel
 from app.infrastructure.database.repositories.users import SqlAlchemyUserRepository
 
@@ -78,23 +82,7 @@ class SqlAlchemyAdminFinanceReader:
             .order_by(TransactionModel.occurred_at.desc())
             .limit(limit)
         ).all()
-        return [
-            Transaction(
-                id=model.id,
-                user_id=model.user_id,
-                category_id=model.category_id,
-                category_name=model.category.name,
-                category_color=model.category.color,
-                kind=TransactionKind(model.kind),
-                amount_minor=model.amount_minor,
-                description=model.description,
-                occurred_at=model.occurred_at,
-                created_at=model.created_at,
-                subscription_id=model.subscription_id,
-                subscription_charge_date=model.subscription_charge_date,
-            )
-            for model in models
-        ]
+        return [to_transaction_domain(model) for model in models]
 
     def list_category_spending(
         self,
@@ -137,22 +125,7 @@ class SqlAlchemyAdminFinanceReader:
             )
             .order_by(SubscriptionModel.next_charge_date, SubscriptionModel.name)
         ).all()
-        return [
-            Subscription(
-                id=model.id,
-                user_id=model.user_id,
-                category_id=model.category_id,
-                category_name=model.category.name,
-                category_color=model.category.color,
-                name=model.name,
-                amount_minor=model.amount_minor,
-                billing_day=model.billing_day,
-                next_charge_date=model.next_charge_date,
-                is_active=model.is_active,
-                created_at=model.created_at,
-            )
-            for model in models
-        ]
+        return [to_subscription_domain(model) for model in models]
 
 
 class SqlAlchemyAdminUserManager:

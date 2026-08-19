@@ -1,8 +1,17 @@
 from datetime import datetime
 from uuid import UUID
 
-from app.application.admin.errors import AdminUserNotFoundError
-from app.application.admin.ports import AdminFinanceReader, AdminUserReader
+from app.application.admin.errors import (
+    AdminUserNotFoundError,
+    CannotDeactivateSelfError,
+    CannotRemoveOwnAdminRoleError,
+)
+from app.application.admin.ports import (
+    AdminFinanceReader,
+    AdminUserManager,
+    AdminUserReader,
+)
+from app.domain.identity.user import User
 from app.domain.admin.models import AdminUserFinanceDetails, AdminUserSummary
 
 
@@ -63,3 +72,39 @@ class GetAdminUserFinanceDetails:
                 self._finances.list_active_subscriptions(user_id)
             ),
         )
+
+
+class ChangeAdminUserStatus:
+    def __init__(self, users: AdminUserManager) -> None:
+        self._users = users
+
+    def execute(
+        self,
+        actor_id: UUID,
+        target_user_id: UUID,
+        is_active: bool,
+    ) -> User:
+        if actor_id == target_user_id and not is_active:
+            raise CannotDeactivateSelfError
+        user = self._users.set_active(target_user_id, is_active)
+        if user is None:
+            raise AdminUserNotFoundError
+        return user
+
+
+class ChangeAdminUserRole:
+    def __init__(self, users: AdminUserManager) -> None:
+        self._users = users
+
+    def execute(
+        self,
+        actor_id: UUID,
+        target_user_id: UUID,
+        is_admin: bool,
+    ) -> User:
+        if actor_id == target_user_id and not is_admin:
+            raise CannotRemoveOwnAdminRoleError
+        user = self._users.set_admin_role(target_user_id, is_admin)
+        if user is None:
+            raise AdminUserNotFoundError
+        return user

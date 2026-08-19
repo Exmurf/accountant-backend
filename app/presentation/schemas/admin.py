@@ -4,6 +4,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from app.domain.admin.models import AdminUserFinanceDetails, AdminUserSummary
+from app.domain.identity.user import User
 from app.presentation.schemas.ledger import SubscriptionResponse, TransactionResponse
 
 
@@ -72,4 +73,26 @@ class AdminUserFinanceDetailsResponse(BaseModel):
                 SubscriptionResponse.from_domain(subscription)
                 for subscription in details.subscriptions
             ],
+        )
+
+
+class ChangeAdminUserStatusRequest(BaseModel):
+    is_active: bool
+
+
+class ChangeAdminUserRoleRequest(BaseModel):
+    is_admin: bool
+
+
+class AdminUserAccessResponse(BaseModel):
+    id: UUID
+    is_active: bool
+    roles: list[str]
+
+    @classmethod
+    def from_user(cls, user: User) -> "AdminUserAccessResponse":
+        return cls(
+            id=user.id,
+            is_active=user.is_active,
+            roles=sorted(user.roles),
         )

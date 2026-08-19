@@ -73,6 +73,8 @@ token it was just handed.
 - Dates are persisted in UTC and interpreted using the user's time zone.
 - Scheduled transactions and posted transactions are separate concepts.
 - Savings transfers do not count as spending.
+- A user may set a savings goal; leaving it at zero lets the chart pick the next
+  round number above the balance instead.
 
 ## Ledger and categories
 

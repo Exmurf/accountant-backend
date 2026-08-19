@@ -11,6 +11,7 @@ class User:
     password_hash: str
     is_active: bool
     opening_balance_minor: int
+    savings_goal_minor: int
     daily_summary_enabled: bool
     daily_summary_time: time
     budget_alerts_enabled: bool

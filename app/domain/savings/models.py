@@ -19,3 +19,4 @@ class SavingsOverview:
     total_saved_minor: int
     current_month_projection_minor: int
     entries: tuple[MonthlySaving, ...]
+    goal_minor: int = 0

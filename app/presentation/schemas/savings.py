@@ -1,7 +1,8 @@
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.domain.savings.models import MonthlySaving, SavingsOverview
 
@@ -26,9 +27,17 @@ class MonthlySavingResponse(BaseModel):
         )
 
 
+class SetSavingsGoalRequest(BaseModel):
+    goal: Decimal = Field(ge=0, max_digits=12, decimal_places=2)
+
+    def goal_as_minor(self) -> int:
+        return int(self.goal * 100)
+
+
 class SavingsOverviewResponse(BaseModel):
     total_saved_minor: int
     current_month_projection_minor: int
+    goal_minor: int
     entries: list[MonthlySavingResponse]
 
     @classmethod
@@ -38,6 +47,7 @@ class SavingsOverviewResponse(BaseModel):
             current_month_projection_minor=(
                 overview.current_month_projection_minor
             ),
+            goal_minor=overview.goal_minor,
             entries=[
                 MonthlySavingResponse.from_domain(entry)
                 for entry in overview.entries

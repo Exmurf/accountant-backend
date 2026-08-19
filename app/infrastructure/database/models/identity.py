@@ -86,6 +86,11 @@ class UserModel(Base):
         default=True,
         server_default="true",
     )
+    savings_goal_minor: Mapped[int] = mapped_column(
+        BigInteger,
+        default=0,
+        server_default="0",
+    )
     password_changed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )

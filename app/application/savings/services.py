@@ -1,7 +1,11 @@
 from datetime import date, datetime, time, tzinfo
 from uuid import UUID
 
-from app.application.savings.ports import MonthlyCashFlowReader, SavingsRepository
+from app.application.savings.ports import (
+    MonthlyCashFlowReader,
+    SavingsGoalRepository,
+    SavingsRepository,
+)
 from app.domain.savings.models import SavingsOverview
 
 
@@ -26,6 +30,7 @@ class ProcessMonthlySavings:
         account_created_at: datetime,
         today: date,
         timezone: tzinfo,
+        goal_minor: int = 0,
     ) -> SavingsOverview:
         account_created_local = account_created_at.astimezone(timezone)
         cursor = date(
@@ -72,4 +77,18 @@ class ProcessMonthlySavings:
                 -accumulated_minor,
             ),
             entries=tuple(entries),
+            goal_minor=goal_minor,
         )
+
+
+class SetSavingsGoal:
+    """Store the amount the savings chart is measured against."""
+
+    def __init__(self, users: SavingsGoalRepository) -> None:
+        self._users = users
+
+    def execute(self, user_id: UUID, goal_minor: int) -> int:
+        stored = self._users.set_savings_goal(user_id, goal_minor)
+        if stored is None:
+            raise RuntimeError("Authenticated user could not be updated")
+        return stored

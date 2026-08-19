@@ -23,10 +23,6 @@ class MonthlySavingModel(Base):
             "month BETWEEN 1 AND 12",
             name="ck_monthly_savings_month",
         ),
-        CheckConstraint(
-            "amount_minor >= 0",
-            name="ck_monthly_savings_amount_non_negative",
-        ),
         UniqueConstraint(
             "user_id",
             "year",

@@ -34,6 +34,7 @@ class ProcessMonthlySavings:
             1,
         )
         current_month = date(today.year, today.month, 1)
+        accumulated_minor = 0
 
         while cursor < current_month:
             following_month = _next_month(cursor)
@@ -42,12 +43,17 @@ class ProcessMonthlySavings:
                 datetime.combine(cursor, time.min, tzinfo=timezone),
                 datetime.combine(following_month, time.min, tzinfo=timezone),
             )
+            monthly_change_minor = max(
+                income_minor - expense_minor,
+                -accumulated_minor,
+            )
             self._savings.upsert_month(
                 user_id=user_id,
                 year=cursor.year,
                 month=cursor.month,
-                amount_minor=max(income_minor - expense_minor, 0),
+                amount_minor=monthly_change_minor,
             )
+            accumulated_minor += monthly_change_minor
             cursor = following_month
 
         following_month = _next_month(current_month)
@@ -63,7 +69,7 @@ class ProcessMonthlySavings:
             total_saved_minor=sum(entry.amount_minor for entry in entries),
             current_month_projection_minor=max(
                 current_income_minor - current_expense_minor,
-                0,
+                -accumulated_minor,
             ),
             entries=tuple(entries),
         )

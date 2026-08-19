@@ -29,12 +29,17 @@ def get_current_user(
         raise unauthorized
 
     try:
-        user_id = JwtTokenService(get_settings()).decode_subject(token)
+        claims = JwtTokenService(get_settings()).decode(token)
     except (jwt.InvalidTokenError, ValueError, KeyError):
         raise unauthorized from None
 
-    user = SqlAlchemyUserRepository(session).get_by_id(user_id)
+    user = SqlAlchemyUserRepository(session).get_by_id(claims.user_id)
     if user is None or not user.is_active:
+        raise unauthorized
+    if (
+        user.password_changed_at is not None
+        and claims.issued_at < user.password_changed_at
+    ):
         raise unauthorized
     return user
 

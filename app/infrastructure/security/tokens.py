@@ -6,6 +6,7 @@ from uuid import UUID
 import jwt
 
 from app.core.config import Settings
+from app.domain.identity.session import AccessTokenClaims
 
 
 class JwtTokenService:
@@ -27,9 +28,12 @@ class JwtTokenService:
             algorithm=self.algorithm,
         )
 
-    def decode_subject(self, token: str) -> UUID:
+    def decode(self, token: str) -> AccessTokenClaims:
         payload = jwt.decode(token, self._secret, algorithms=[self.algorithm])
-        return UUID(payload["sub"])
+        return AccessTokenClaims(
+            user_id=UUID(payload["sub"]),
+            issued_at=datetime.fromtimestamp(payload["iat"], UTC),
+        )
 
 
 class OpaqueRefreshTokenService:

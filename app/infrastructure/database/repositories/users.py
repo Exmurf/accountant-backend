@@ -1,4 +1,4 @@
-from datetime import time
+from datetime import UTC, datetime, time
 from uuid import UUID
 
 from sqlalchemy import select
@@ -89,6 +89,24 @@ class SqlAlchemyUserRepository:
             return None
         return self._to_domain(persisted)
 
+    def update_password(self, user_id: UUID, password_hash: str) -> User | None:
+        model = self._session.get(UserModel, user_id)
+        if model is None:
+            return None
+
+        model.password_hash = password_hash
+        # Access tokens carry whole-second `iat` values, so the marker is kept at
+        # the same resolution; a token minted in this second stays valid.
+        model.password_changed_at = datetime.now(UTC).replace(microsecond=0)
+        self._session.commit()
+
+        persisted = self._session.scalar(
+            self._user_query().where(UserModel.id == user_id)
+        )
+        if persisted is None:
+            return None
+        return self._to_domain(persisted)
+
     def set_opening_balance(self, user_id: UUID, amount_minor: int) -> int | None:
         model = self._session.get(UserModel, user_id)
         if model is None:
@@ -122,4 +140,5 @@ class SqlAlchemyUserRepository:
             roles=frozenset(role.name for role in model.roles),
             permissions=frozenset(permissions),
             created_at=model.created_at,
+            password_changed_at=model.password_changed_at,
         )

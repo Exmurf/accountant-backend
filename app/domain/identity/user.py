@@ -17,3 +17,4 @@ class User:
     roles: frozenset[str]
     permissions: frozenset[str]
     created_at: datetime
+    password_changed_at: datetime | None = None

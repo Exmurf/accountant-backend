@@ -9,7 +9,9 @@ from app.application.identity.errors import (
     InactiveUserError,
     InvalidCredentialsError,
     InvalidRefreshTokenError,
+    PasswordUnchangedError,
 )
+from app.application.identity.change_password import ChangePassword
 from app.application.identity.issue_session import IssueSession
 from app.application.identity.login_user import LoginUser
 from app.application.identity.refresh_session import RefreshSession
@@ -30,6 +32,7 @@ from app.presentation.dependencies.auth import (
     get_current_user,
 )
 from app.presentation.schemas.auth import (
+    ChangePasswordRequest,
     LoginRequest,
     LogoutResponse,
     RegisterRequest,
@@ -196,6 +199,39 @@ def update_me(
         daily_summary_time=payload.daily_summary_time,
         budget_alerts_enabled=payload.budget_alerts_enabled,
     )
+    return UserResponse.from_domain(updated_user)
+
+
+@router.patch("/me/password", response_model=UserResponse)
+def change_password(
+    payload: ChangePasswordRequest,
+    response: Response,
+    session: Annotated[Session, Depends(get_database_session)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> UserResponse:
+    try:
+        updated_user = ChangePassword(
+            users=SqlAlchemyUserRepository(session),
+            passwords=Argon2PasswordHasher(),
+            refresh_token_repository=SqlAlchemyRefreshTokenRepository(session),
+        ).execute(
+            user_id=user.id,
+            current_password=payload.current_password,
+            new_password=payload.new_password,
+        )
+    except InvalidCredentialsError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Mevcut şifren hatalı.",
+        ) from None
+    except PasswordUnchangedError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Yeni şifren mevcut şifrenden farklı olmalı.",
+        ) from None
+
+    # Every refresh token was just revoked, so this session needs a fresh one.
+    issue_session(response, updated_user, session)
     return UserResponse.from_domain(updated_user)
 
 

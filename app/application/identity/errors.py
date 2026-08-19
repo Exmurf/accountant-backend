@@ -12,3 +12,7 @@ class InactiveUserError(Exception):
 
 class InvalidRefreshTokenError(Exception):
     pass
+
+
+class PasswordUnchangedError(Exception):
+    pass

@@ -60,6 +60,13 @@ use; only their SHA-256 hashes are persisted and logout revokes the active
 refresh token. FastAPI permission dependencies load current roles and
 permissions from PostgreSQL for each protected request.
 
+Changing a password ends every other session. The stored refresh tokens are
+revoked, and `users.password_changed_at` records the moment so an access token
+minted before it is refused on its next request rather than living out its
+fifteen minutes. Because a JWT `iat` is a whole number of seconds, the marker is
+stored at the same resolution and the session that made the change keeps the
+token it was just handed.
+
 ## Financial rules
 
 - Monetary values are stored as integer minor units (kuruş), never floating point.

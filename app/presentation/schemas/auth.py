@@ -43,6 +43,11 @@ class UserResponse(BaseModel):
         )
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=8, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
 class UpdateUserSettingsRequest(BaseModel):
     display_name: str = Field(min_length=2, max_length=100)
     daily_summary_enabled: bool

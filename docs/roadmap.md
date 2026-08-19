@@ -81,7 +81,8 @@ is an operations step: it needs a Gmail address and a Google App Password in
 
 ## 7. Hardening
 
-- [ ] Password change and reset
+- [x] Password change
+- [ ] Password reset — needs a connected Gmail account, see phase 6
 - [ ] Email change
 - [ ] HTTPS and production setup
 - [ ] Backups and error logs

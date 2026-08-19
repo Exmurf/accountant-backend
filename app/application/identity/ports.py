@@ -2,6 +2,7 @@ from datetime import datetime, time
 from typing import Protocol
 from uuid import UUID
 
+from app.domain.identity.session import AccessTokenClaims
 from app.domain.identity.user import User
 
 
@@ -25,6 +26,8 @@ class UserRepository(Protocol):
         budget_alerts_enabled: bool,
     ) -> User | None: ...
 
+    def update_password(self, user_id: UUID, password_hash: str) -> User | None: ...
+
 
 class PasswordHasher(Protocol):
     def hash(self, password: str) -> str: ...
@@ -35,7 +38,7 @@ class PasswordHasher(Protocol):
 class AccessTokenService(Protocol):
     def create(self, user_id: UUID) -> str: ...
 
-    def decode_subject(self, token: str) -> UUID: ...
+    def decode(self, token: str) -> AccessTokenClaims: ...
 
 
 class RefreshTokenService(Protocol):
@@ -56,3 +59,5 @@ class RefreshTokenRepository(Protocol):
     ) -> UUID | None: ...
 
     def revoke(self, token_hash: str, now: datetime) -> None: ...
+
+    def revoke_all_for_user(self, user_id: UUID, now: datetime) -> None: ...

@@ -88,3 +88,17 @@ REGISTER_WINDOW_SECONDS=3600
 
 The counters are held in the API process, so restarting it clears every
 outstanding lockout.
+
+## Password reset
+
+`POST /auth/password/forgot` mails a single-use link and always answers `202`,
+whether or not the address is registered. The link expires after
+`PASSWORD_RESET_TOKEN_MINUTES` and lands on the web app with a `reset_token`
+query parameter, which opens the reset screen; `POST /auth/password/reset`
+spends it. Requesting a new link retires the previous one, and completing a
+reset signs out every other session.
+
+The link is built from `WEB_ORIGIN`, so that value has to match the address the
+browser actually uses or the mail will point somewhere unreachable. Mail must be
+configured for any of this to work; without it the request is logged and
+dropped.

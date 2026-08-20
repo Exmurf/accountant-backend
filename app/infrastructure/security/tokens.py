@@ -36,9 +36,24 @@ class JwtTokenService:
         )
 
 
-class OpaqueRefreshTokenService:
+class OpaqueTokenService:
+    """A random secret the server only ever keeps the digest of, so a leaked
+    table cannot be replayed against the API."""
+
+    token_bytes = 64
+
     def create(self) -> str:
-        return secrets.token_urlsafe(64)
+        return secrets.token_urlsafe(self.token_bytes)
 
     def hash(self, token: str) -> str:
         return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+class OpaqueRefreshTokenService(OpaqueTokenService):
+    pass
+
+
+class PasswordResetTokenService(OpaqueTokenService):
+    # This one travels in a link and is occasionally copied by hand, so it is
+    # shorter than a refresh token while staying far outside guessing range.
+    token_bytes = 48

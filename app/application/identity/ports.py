@@ -47,6 +47,18 @@ class RefreshTokenService(Protocol):
     def hash(self, token: str) -> str: ...
 
 
+class PasswordResetTokenRepository(Protocol):
+    def replace_for_user(
+        self,
+        user_id: UUID,
+        token_hash: str,
+        expires_at: datetime,
+        now: datetime,
+    ) -> None: ...
+
+    def consume(self, token_hash: str, now: datetime) -> UUID | None: ...
+
+
 class RefreshTokenRepository(Protocol):
     def add(self, user_id: UUID, token_hash: str, expires_at: datetime) -> None: ...
 

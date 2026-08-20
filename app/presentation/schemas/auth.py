@@ -43,6 +43,15 @@ class UserResponse(BaseModel):
         )
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=16, max_length=512)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(min_length=8, max_length=128)
     new_password: str = Field(min_length=8, max_length=128)
@@ -57,3 +66,15 @@ class UpdateUserSettingsRequest(BaseModel):
 
 class LogoutResponse(BaseModel):
     success: bool = True
+
+
+class PasswordResetCompletedResponse(BaseModel):
+    detail: str = "Şifren güncellendi. Yeni şifrenle giriş yapabilirsin."
+
+
+class PasswordResetRequestedResponse(BaseModel):
+    # Deliberately says the same thing whether or not the address is
+    # registered, so the reply cannot be read as an answer.
+    detail: str = (
+        "E-posta adresi kayıtlıysa şifre sıfırlama bağlantısı gönderildi."
+    )

@@ -87,7 +87,7 @@ are given real addresses.
 
 - [x] Password change
 - [x] Rate limiting on sign-in, registration and password change
-- [ ] Password reset — phase 6 is done, so this is no longer blocked
+- [x] Password reset
 - [ ] Email change
 - [ ] HTTPS and production setup
 - [ ] Backups and error logs
@@ -97,3 +97,10 @@ Sign-in counts failures rather than requests, against an email key and a wider
 source-address key. The counters live in the API process, so they reset when it
 restarts; that is intentional for now and is the piece to revisit if the service
 is ever run as more than one process.
+
+Password reset mails a single-use link that expires in an hour and is stored
+only as a digest. Requesting one retires any earlier link, spending one ends
+every open session, and the endpoint answers identically for a registered and
+an unregistered address. `POST /auth/password/forgot` and
+`POST /auth/password/reset` back a reset screen the app opens when it is
+reached with a `reset_token` in the address.

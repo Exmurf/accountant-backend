@@ -86,6 +86,25 @@ of this service is trusted to set it, and honouring a caller-controlled header
 would let an attacker rotate their own key. A trusted-proxy list belongs here
 before the service runs behind a reverse proxy.
 
+A forgotten password is recovered through `password_reset_tokens`, which holds
+only the SHA-256 digest of a link that was mailed once, so the table cannot be
+turned back into a working link. Requesting a reset retires whatever the user
+already had, because asking again is how somebody recovers from a mail that
+never arrived and a forwarded older link must not still open the account.
+Spending a token happens in the transaction that reads it, so two requests
+carrying the same link cannot both succeed, and an expired or already-used one
+is refused. A completed reset revokes every refresh token and stamps
+`password_changed_at`, on the assumption that the reason for the reset was
+somebody else getting in.
+
+The request endpoint answers the same way for an address that is registered and
+one that is not, and does all of its work after the response has been sent, so
+neither the reply nor its timing answers whether an account exists. Reserved
+example domains are skipped, so a seeded account never has an unusable token
+issued for it. Following the link does not open a session: it proves the caller
+holds the mailbox, not that they are at a trusted device, so they sign in with
+the new password like anyone else.
+
 ## Financial rules
 
 - Monetary values are stored as integer minor units (kuruş), never floating point.

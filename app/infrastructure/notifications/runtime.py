@@ -20,14 +20,10 @@ from app.infrastructure.database.repositories.notifications import (
 )
 from app.infrastructure.database.repositories.users import SqlAlchemyUserRepository
 from app.infrastructure.database.session import session_factory
+from app.infrastructure.mail.addresses import is_placeholder_address
 from app.infrastructure.mail.smtp import SmtpMailSender
 
 logger = logging.getLogger(__name__)
-
-
-def _is_placeholder_address(email: str) -> bool:
-    domain = email.rsplit("@", 1)[-1].lower()
-    return domain in {"example.com", "example.org", "example.net"}
 
 
 def _month_range(moment: datetime) -> tuple[datetime, datetime]:
@@ -51,7 +47,7 @@ def notify_budget_limit(user_id: UUID, category_id: UUID) -> None:
             if (
                 user is None
                 or not user.is_active
-                or _is_placeholder_address(user.email)
+                or is_placeholder_address(user.email)
                 or not user.budget_alerts_enabled
             ):
                 return
@@ -86,7 +82,7 @@ def send_daily_summaries() -> None:
             users = SqlAlchemyUserRepository(session).list_active()
             for user in users:
                 if (
-                    _is_placeholder_address(user.email)
+                    is_placeholder_address(user.email)
                     or not user.daily_summary_enabled
                 ):
                     continue

@@ -16,3 +16,7 @@ class InvalidRefreshTokenError(Exception):
 
 class PasswordUnchangedError(Exception):
     pass
+
+
+class InvalidPasswordResetTokenError(Exception):
+    pass

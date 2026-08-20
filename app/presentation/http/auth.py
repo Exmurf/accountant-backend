@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Cookie,
     Depends,
     HTTPException,
@@ -16,6 +17,7 @@ from app.application.identity.errors import (
     EmailAlreadyRegisteredError,
     InactiveUserError,
     InvalidCredentialsError,
+    InvalidPasswordResetTokenError,
     InvalidRefreshTokenError,
     PasswordUnchangedError,
 )
@@ -24,18 +26,27 @@ from app.application.identity.issue_session import IssueSession
 from app.application.identity.login_user import LoginUser
 from app.application.identity.refresh_session import RefreshSession
 from app.application.identity.register_user import RegisterUser
+from app.application.identity.reset_password import ResetPassword
 from app.application.identity.revoke_session import RevokeSession
 from app.application.identity.update_settings import UpdateUserSettings
 from app.application.security.ports import RateLimiter
 from app.core.config import get_settings
 from app.domain.identity.user import User
+from app.infrastructure.database.repositories.password_resets import (
+    SqlAlchemyPasswordResetTokenRepository,
+)
 from app.infrastructure.database.repositories.refresh_tokens import (
     SqlAlchemyRefreshTokenRepository,
 )
 from app.infrastructure.database.repositories.users import SqlAlchemyUserRepository
 from app.infrastructure.database.session import get_database_session
 from app.infrastructure.security.passwords import Argon2PasswordHasher
-from app.infrastructure.security.tokens import JwtTokenService, OpaqueRefreshTokenService
+from app.infrastructure.identity.runtime import deliver_password_reset
+from app.infrastructure.security.tokens import (
+    JwtTokenService,
+    OpaqueRefreshTokenService,
+    PasswordResetTokenService,
+)
 from app.presentation.dependencies.auth import (
     ACCESS_COOKIE_NAME,
     get_current_user,
@@ -47,9 +58,13 @@ from app.presentation.dependencies.rate_limit import (
 )
 from app.presentation.schemas.auth import (
     ChangePasswordRequest,
+    ForgotPasswordRequest,
     LoginRequest,
     LogoutResponse,
+    PasswordResetCompletedResponse,
+    PasswordResetRequestedResponse,
     RegisterRequest,
+    ResetPasswordRequest,
     UpdateUserSettingsRequest,
     UserResponse,
 )
@@ -59,6 +74,7 @@ REFRESH_COOKIE_NAME = "accountant_refresh"
 TOO_MANY_LOGINS = "Çok fazla başarısız giriş denemesi."
 TOO_MANY_REGISTRATIONS = "Çok fazla kayıt denemesi."
 TOO_MANY_PASSWORD_ATTEMPTS = "Çok fazla başarısız şifre denemesi."
+TOO_MANY_RESET_REQUESTS = "Çok fazla şifre sıfırlama isteği."
 
 
 def issue_session(response: Response, user: User, session: Session) -> None:
@@ -247,6 +263,91 @@ def refresh(
 
     set_session_cookies(response, tokens.access_token, tokens.refresh_token)
     return LogoutResponse()
+
+
+@router.post(
+    "/password/forgot",
+    response_model=PasswordResetRequestedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
+) -> PasswordResetRequestedResponse:
+    settings = get_settings()
+    email = str(payload.email).strip().lower()
+    if settings.rate_limit_enabled:
+        address_key = f"reset-request:ip:{client_address(request)}"
+        email_key = f"reset-request:email:{email}"
+        enforce(
+            limiter.peek(
+                address_key,
+                settings.password_reset_ip_max_attempts,
+                settings.password_reset_window_seconds,
+            ),
+            TOO_MANY_RESET_REQUESTS,
+        )
+        enforce(
+            limiter.peek(
+                email_key,
+                settings.password_reset_max_attempts,
+                settings.password_reset_window_seconds,
+            ),
+            TOO_MANY_RESET_REQUESTS,
+        )
+        limiter.record(address_key, settings.password_reset_window_seconds)
+        limiter.record(email_key, settings.password_reset_window_seconds)
+
+    # Every part of the work runs after the response, so a registered
+    # address and an unknown one are indistinguishable, in what comes back
+    # and in how long it took.
+    background_tasks.add_task(deliver_password_reset, email)
+    return PasswordResetRequestedResponse()
+
+
+@router.post("/password/reset", response_model=PasswordResetCompletedResponse)
+def reset_password(
+    payload: ResetPasswordRequest,
+    request: Request,
+    session: Annotated[Session, Depends(get_database_session)],
+    limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
+) -> PasswordResetCompletedResponse:
+    settings = get_settings()
+    address_key = f"reset-submit:ip:{client_address(request)}"
+    if settings.rate_limit_enabled:
+        enforce(
+            limiter.peek(
+                address_key,
+                settings.login_ip_max_attempts,
+                settings.login_window_seconds,
+            ),
+            TOO_MANY_RESET_REQUESTS,
+        )
+
+    try:
+        ResetPassword(
+            users=SqlAlchemyUserRepository(session),
+            passwords=Argon2PasswordHasher(),
+            reset_tokens=SqlAlchemyPasswordResetTokenRepository(session),
+            token_service=PasswordResetTokenService(),
+            refresh_token_repository=SqlAlchemyRefreshTokenRepository(session),
+        ).execute(token=payload.token, new_password=payload.new_password)
+    except InvalidPasswordResetTokenError:
+        if settings.rate_limit_enabled:
+            limiter.record(address_key, settings.login_window_seconds)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Bağlantı geçersiz ya da süresi dolmuş. "
+                "Lütfen yeniden şifre sıfırlama isteği gönder."
+            ),
+        ) from None
+
+    # No session is opened here on purpose: whoever follows the link proves
+    # they hold the mailbox, not that they are sitting at a trusted device.
+    return PasswordResetCompletedResponse()
 
 
 @router.get("/me", response_model=UserResponse)

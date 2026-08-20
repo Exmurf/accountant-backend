@@ -171,7 +171,21 @@ so the panel can never widen anyone's access.
 
 ## Notifications
 
-Daily summaries will be scheduled inside the Python application. Email will be
-sent directly with Gmail SMTP and Python's standard `smtplib`; no external email
-delivery provider will be introduced. For the first deployment, the scheduler
-will run as a single application process to avoid duplicate jobs.
+Daily summaries are scheduled inside the Python application. Email is sent
+directly with Gmail SMTP and Python's standard `smtplib`; no external email
+delivery provider is used. The scheduler runs as a single application process
+to avoid duplicate jobs.
+
+A summary covers a day, not a moment, so the sweep looks back a few days and
+sends any day that has no delivery recorded yet, oldest first. Only today was
+ever considered before, which meant a night with the service stopped lost that
+day's summary for good. The look-back is deliberately short: returning from a
+long outage should not fire off a fortnight of mail at once. Days before the
+account existed are never owed, and a catch-up names its date instead of
+calling itself today.
+
+A budget warning is keyed by category, month and the limit itself. Raising a
+limit therefore opens a fresh warning for the new ceiling, because somebody who
+deliberately moved the line still expects to hear about crossing it; leaving the
+limit alone keeps the old key, which is what stops a warning arriving with every
+purchase.

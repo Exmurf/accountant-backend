@@ -98,6 +98,10 @@ source-address key. The counters live in the API process, so they reset when it
 restarts; that is intentional for now and is the piece to revisit if the service
 is ever run as more than one process.
 
+A budget warning is keyed by category, month and limit, and the daily summary
+sweep catches up on days it missed. The savings walk reads the whole ledger in
+one grouped query rather than one query per month.
+
 Password reset mails a single-use link that expires in an hour and is stored
 only as a digest. Requesting one retires any earlier link, spending one ends
 every open session, and the endpoint answers identically for a registered and

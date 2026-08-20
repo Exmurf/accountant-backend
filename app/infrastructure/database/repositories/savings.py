@@ -14,14 +14,26 @@ class SqlAlchemyMonthlyCashFlowReader:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def totals_for_period(
+    def monthly_totals(
         self,
         user_id: UUID,
-        start: datetime,
-        end: datetime,
-    ) -> tuple[int, int]:
-        income_minor, expense_minor = self._session.execute(
+        timezone_name: str,
+    ) -> dict[tuple[int, int], tuple[int, int]]:
+        """Every month's income and expense in a single pass.
+
+        Months used to be totalled one query at a time as the walk stepped
+        through them, which made the savings page slower the longer somebody
+        had been using the app. Grouping happens in the user's own zone, so a
+        purchase made just before midnight belongs to the month they made it in
+        rather than the month UTC happened to be in.
+        """
+        month_start = func.date_trunc(
+            "month",
+            func.timezone(timezone_name, TransactionModel.occurred_at),
+        ).label("month_start")
+        rows = self._session.execute(
             select(
+                month_start,
                 func.coalesce(
                     func.sum(
                         case(
@@ -48,20 +60,14 @@ class SqlAlchemyMonthlyCashFlowReader:
                     ),
                     0,
                 ),
-            ).where(
-                TransactionModel.user_id == user_id,
-                TransactionModel.occurred_at >= start,
-                TransactionModel.occurred_at < end,
             )
-        ).one()
-        return int(income_minor), int(expense_minor)
-
-    def earliest_transaction_at(self, user_id: UUID) -> datetime | None:
-        return self._session.scalar(
-            select(func.min(TransactionModel.occurred_at)).where(
-                TransactionModel.user_id == user_id
-            )
-        )
+            .where(TransactionModel.user_id == user_id)
+            .group_by(month_start)
+        ).all()
+        return {
+            (row[0].year, row[0].month): (int(row[1]), int(row[2]))
+            for row in rows
+        }
 
 
 class SqlAlchemySavingsRepository:

@@ -65,6 +65,14 @@ category first exceeds its monthly limit. New users default to 21:00 and can
 change the time from the application settings. Example-domain accounts are
 skipped.
 
+If the service is stopped when a summary was due, the sweep still catches it:
+it looks back `DAILY_SUMMARY_CATCHUP_DAYS` days and sends any day with no
+delivery recorded, oldest first, naming the date rather than calling it today.
+Set it to `0` to send only the current day. A budget warning is keyed by
+category, month and limit, so it arrives once per limit: raising a limit opens
+a fresh warning for the new ceiling, while leaving it alone keeps the account
+quiet for the rest of the month.
+
 Paste the app password without the spaces Google shows it with. Docker Compose
 passes `env_file` values through untouched, so a stray trailing space becomes
 part of the password and Gmail answers `535 Authentication failed`.

@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
@@ -6,14 +5,11 @@ from app.domain.savings.models import MonthlySaving
 
 
 class MonthlyCashFlowReader(Protocol):
-    def totals_for_period(
+    def monthly_totals(
         self,
         user_id: UUID,
-        start: datetime,
-        end: datetime,
-    ) -> tuple[int, int]: ...
-
-    def earliest_transaction_at(self, user_id: UUID) -> datetime | None: ...
+        timezone_name: str,
+    ) -> dict[tuple[int, int], tuple[int, int]]: ...
 
 
 class SavingsGoalRepository(Protocol):

@@ -1,7 +1,8 @@
 import asyncio
 import logging
+from collections.abc import Iterator
 from contextlib import suppress
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -10,6 +11,7 @@ from app.application.notifications.services import (
     SendDailyExpenseSummary,
 )
 from app.core.config import get_settings
+from app.domain.identity.user import User
 from app.infrastructure.database.repositories.ledger import (
     SqlAlchemyBudgetRepository,
     SqlAlchemySubscriptionRepository,
@@ -68,14 +70,43 @@ def notify_budget_limit(user_id: UUID, category_id: UUID) -> None:
         logger.exception("Budget notification could not be sent")
 
 
+def _summary_dates_owed(
+    user: User,
+    now: datetime,
+    catchup_days: int,
+) -> Iterator[date]:
+    """The days that still owe this user a summary, oldest first.
+
+    Only today was ever considered before, so a night with the service stopped
+    meant that day's summary was lost for good; unlike due subscriptions, which
+    have always caught up on every month they missed. The look-back is short on
+    purpose: coming back from a long outage should not fire off a fortnight of
+    mail at once. Days before the account existed are never owed, and whether a
+    day was already sent is settled by the delivery record.
+    """
+    created_on = user.created_at.astimezone(now.tzinfo).date()
+    for offset in range(catchup_days, -1, -1):
+        summary_date = now.date() - timedelta(days=offset)
+        if summary_date < created_on:
+            continue
+        if offset == 0:
+            # Today is the only day whose chosen hour may still be ahead of us.
+            scheduled_at = datetime.combine(
+                summary_date,
+                user.daily_summary_time,
+                tzinfo=now.tzinfo,
+            )
+            if now < scheduled_at:
+                continue
+        yield summary_date
+
+
 def send_daily_summaries() -> None:
     settings = get_settings()
     if not settings.mail_enabled:
         return
     timezone = ZoneInfo(settings.app_timezone)
     now = datetime.now(timezone)
-    day_start = datetime.combine(now.date(), time.min, tzinfo=timezone)
-    day_end = day_start + timedelta(days=1)
 
     try:
         with session_factory() as session:
@@ -86,31 +117,37 @@ def send_daily_summaries() -> None:
                     or not user.daily_summary_enabled
                 ):
                     continue
-                scheduled_at = datetime.combine(
-                    now.date(),
-                    user.daily_summary_time,
-                    tzinfo=timezone,
-                )
-                if now < scheduled_at:
-                    continue
-                try:
-                    SendDailyExpenseSummary(
-                        transactions=SqlAlchemyTransactionRepository(session),
-                        deliveries=SqlAlchemyNotificationDeliveryRepository(session),
-                        mailer=SmtpMailSender(settings),
-                    ).execute(
-                        user=user,
-                        summary_date=now.date(),
-                        period_start=day_start,
-                        period_end=day_end,
-                        delivered_at=now,
+                for summary_date in _summary_dates_owed(
+                    user,
+                    now,
+                    settings.daily_summary_catchup_days,
+                ):
+                    day_start = datetime.combine(
+                        summary_date,
+                        time.min,
+                        tzinfo=timezone,
                     )
-                except Exception:
-                    session.rollback()
-                    logger.exception(
-                        "Daily summary could not be sent for user %s",
-                        user.id,
-                    )
+                    try:
+                        SendDailyExpenseSummary(
+                            transactions=SqlAlchemyTransactionRepository(session),
+                            deliveries=SqlAlchemyNotificationDeliveryRepository(
+                                session
+                            ),
+                            mailer=SmtpMailSender(settings),
+                        ).execute(
+                            user=user,
+                            summary_date=summary_date,
+                            period_start=day_start,
+                            period_end=day_start + timedelta(days=1),
+                            delivered_at=now,
+                        )
+                    except Exception:
+                        session.rollback()
+                        logger.exception(
+                            "Daily summary for %s could not be sent for user %s",
+                            summary_date,
+                            user.id,
+                        )
     except Exception:
         logger.exception("Daily summary job failed")
 

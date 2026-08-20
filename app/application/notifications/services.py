@@ -75,7 +75,11 @@ class SendBudgetExceededNotification:
         if used_minor <= budget.limit_minor:
             return False
 
-        reference_key = f"{category_id}:{period_start:%Y-%m}"
+        # The limit is part of the key, so raising it opens a fresh warning
+        # for the new ceiling: somebody who deliberately moved the line still
+        # expects to hear about crossing it. Leaving the limit alone keeps the
+        # old key, which is what stops a warning every time money is spent.
+        reference_key = f"{category_id}:{period_start:%Y-%m}:{budget.limit_minor}"
         kind = "BUDGET_EXCEEDED"
         if self._deliveries.was_delivered(user.id, kind, reference_key):
             return False
@@ -126,6 +130,14 @@ class SendDailyExpenseSummary:
         if self._deliveries.was_delivered(user.id, kind, reference_key):
             return False
 
+        # A catch-up summary is for a day that has already passed, so it says
+        # which one rather than calling it today.
+        is_today = delivered_at.date() == summary_date
+        day_label = "Bugün" if is_today else f"{summary_date:%d.%m.%Y} günü"
+        total_label = (
+            "Bugünkü" if is_today else f"{summary_date:%d.%m.%Y} tarihli"
+        )
+
         expenses = [
             item
             for item in self._transactions.list_for_user(
@@ -150,14 +162,14 @@ class SendDailyExpenseSummary:
             )
         )
         if not breakdown:
-            breakdown = "- Bugün gider kaydı bulunmuyor."
+            breakdown = "- Gider kaydı bulunmuyor."
 
         self._mailer.send(
             recipient=user.email,
-            subject=f"Bugün {total_minor / 100:,.2f} TL harcadın",
+            subject=f"{day_label} {total_minor / 100:,.2f} TL harcadın",
             text_body=(
                 f"Merhaba {user.display_name},\n\n"
-                f"Bugünkü toplam harcaman: {total_minor / 100:,.2f} TL\n\n"
+                f"{total_label} toplam harcaman: {total_minor / 100:,.2f} TL\n\n"
                 f"Kategori özeti:\n{breakdown}\n\n"
                 "Accountant"
             ),

@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     mail_from_name: str = "Accountant"
     mail_smtp_host: str = "smtp.gmail.com"
     mail_smtp_port: int = Field(default=587, ge=1, le=65535)
+    daily_summary_catchup_days: int = Field(default=3, ge=0, le=31)
 
     @property
     def mail_enabled(self) -> bool:

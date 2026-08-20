@@ -1,5 +1,6 @@
-from datetime import date, datetime, time, tzinfo
+from datetime import date, datetime
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from app.application.savings.ports import (
     MonthlyCashFlowReader,
@@ -29,9 +30,13 @@ class ProcessMonthlySavings:
         user_id: UUID,
         account_created_at: datetime,
         today: date,
-        timezone: tzinfo,
+        timezone: ZoneInfo,
         goal_minor: int = 0,
     ) -> SavingsOverview:
+        # The whole ledger, bucketed by month, in one read. Every month the walk
+        # covers is answered from here.
+        totals = self._cash_flow.monthly_totals(user_id, timezone.key)
+
         account_created_local = account_created_at.astimezone(timezone)
         cursor = date(
             account_created_local.year,
@@ -42,23 +47,17 @@ class ProcessMonthlySavings:
         # Signing up is not where the history starts. A transaction may carry
         # any past date, and a month the walk never reaches is a month that
         # never gets closed, so it would be missing from savings for good.
-        earliest_at = self._cash_flow.earliest_transaction_at(user_id)
-        if earliest_at is not None:
-            earliest_local = earliest_at.astimezone(timezone)
-            cursor = min(
-                cursor,
-                date(earliest_local.year, earliest_local.month, 1),
-            )
+        if totals:
+            earliest_year, earliest_month = min(totals)
+            cursor = min(cursor, date(earliest_year, earliest_month, 1))
 
         current_month = date(today.year, today.month, 1)
         accumulated_minor = 0
 
         while cursor < current_month:
-            following_month = _next_month(cursor)
-            income_minor, expense_minor = self._cash_flow.totals_for_period(
-                user_id,
-                datetime.combine(cursor, time.min, tzinfo=timezone),
-                datetime.combine(following_month, time.min, tzinfo=timezone),
+            income_minor, expense_minor = totals.get(
+                (cursor.year, cursor.month),
+                (0, 0),
             )
             monthly_change_minor = max(
                 income_minor - expense_minor,
@@ -71,15 +70,11 @@ class ProcessMonthlySavings:
                 amount_minor=monthly_change_minor,
             )
             accumulated_minor += monthly_change_minor
-            cursor = following_month
+            cursor = _next_month(cursor)
 
-        following_month = _next_month(current_month)
-        current_income_minor, current_expense_minor = (
-            self._cash_flow.totals_for_period(
-                user_id,
-                datetime.combine(current_month, time.min, tzinfo=timezone),
-                datetime.combine(following_month, time.min, tzinfo=timezone),
-            )
+        current_income_minor, current_expense_minor = totals.get(
+            (current_month.year, current_month.month),
+            (0, 0),
         )
         entries = self._savings.list_for_user(user_id)
         return SavingsOverview(

@@ -113,6 +113,10 @@ the new password like anyone else.
 - Savings transfers do not count as spending.
 - A user may set a savings goal; leaving it at zero lets the chart pick the next
   round number above the balance instead.
+- A savings history starts at the earlier of the account's first month and its
+  oldest transaction. Signing up does not mark where the money starts: a
+  transaction can be recorded with any past date, and a month the monthly close
+  never walks over is one that stays missing from savings for good.
 
 ## Ledger and categories
 

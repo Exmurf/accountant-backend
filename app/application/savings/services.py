@@ -38,6 +38,18 @@ class ProcessMonthlySavings:
             account_created_local.month,
             1,
         )
+
+        # Signing up is not where the history starts. A transaction may carry
+        # any past date, and a month the walk never reaches is a month that
+        # never gets closed, so it would be missing from savings for good.
+        earliest_at = self._cash_flow.earliest_transaction_at(user_id)
+        if earliest_at is not None:
+            earliest_local = earliest_at.astimezone(timezone)
+            cursor = min(
+                cursor,
+                date(earliest_local.year, earliest_local.month, 1),
+            )
+
         current_month = date(today.year, today.month, 1)
         accumulated_minor = 0
 

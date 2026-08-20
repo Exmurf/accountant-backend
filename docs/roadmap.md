@@ -25,7 +25,7 @@ history cannot make today's figures look wrong.
 
 - [x] Store the money left at the end of a month
 - [x] Automatic monthly close — `POST /savings/process-month-end` catches up
-      every month since the account was created
+      every closed month since the history starts
 - [x] Total savings
 - [x] Monthly savings history
 - [x] Savings screen

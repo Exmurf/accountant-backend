@@ -56,6 +56,13 @@ class SqlAlchemyMonthlyCashFlowReader:
         ).one()
         return int(income_minor), int(expense_minor)
 
+    def earliest_transaction_at(self, user_id: UUID) -> datetime | None:
+        return self._session.scalar(
+            select(func.min(TransactionModel.occurred_at)).where(
+                TransactionModel.user_id == user_id
+            )
+        )
+
 
 class SqlAlchemySavingsRepository:
     def __init__(self, session: Session) -> None:

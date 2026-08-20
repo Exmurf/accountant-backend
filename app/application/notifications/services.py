@@ -6,6 +6,12 @@ from app.application.ledger.ports import (
     SubscriptionRepository,
     TransactionRepository,
 )
+from app.application.notifications.message import (
+    MailFigure,
+    MailMessage,
+    MailRow,
+    format_lira,
+)
 from app.application.notifications.ports import (
     MailSender,
     NotificationDeliveryRepository,
@@ -88,13 +94,24 @@ class SendBudgetExceededNotification:
         self._mailer.send(
             recipient=user.email,
             subject=f"{budget.category_name} aylık limitini aştın",
-            text_body=(
-                f"Merhaba {user.display_name},\n\n"
-                f"{budget.category_name} kategorisinde bu ay "
-                f"{used_minor / 100:,.2f} TL kullandın. "
-                f"Aylık limitin {budget.limit_minor / 100:,.2f} TL ve "
-                f"limiti {exceeded_minor / 100:,.2f} TL aştın.\n\n"
-                "Accountant"
+            message=MailMessage(
+                greeting=f"Merhaba {user.display_name},",
+                figure=MailFigure(
+                    label=f"{budget.category_name} · bu ay",
+                    value=format_lira(used_minor),
+                ),
+                rows=(
+                    MailRow("Aylık limitin", format_lira(budget.limit_minor)),
+                    MailRow("Limit aşımı", format_lira(exceeded_minor)),
+                ),
+                notice=(
+                    f"{budget.category_name} kategorisinde aylık limitini "
+                    f"{format_lira(exceeded_minor)} aştın."
+                ),
+                footnote=(
+                    "Limitini değiştirirsen yeni tavanı aştığında yeniden "
+                    "haber veririz."
+                ),
             ),
         )
         self._deliveries.mark_delivered(
@@ -153,25 +170,31 @@ class SendDailyExpenseSummary:
             category_totals[item.category_name] = (
                 category_totals.get(item.category_name, 0) + item.amount_minor
             )
-        breakdown = "\n".join(
-            f"- {name}: {amount / 100:,.2f} TL"
+        rows = tuple(
+            MailRow(name, format_lira(amount))
             for name, amount in sorted(
                 category_totals.items(),
                 key=lambda pair: pair[1],
                 reverse=True,
             )
         )
-        if not breakdown:
-            breakdown = "- Gider kaydı bulunmuyor."
 
         self._mailer.send(
             recipient=user.email,
-            subject=f"{day_label} {total_minor / 100:,.2f} TL harcadın",
-            text_body=(
-                f"Merhaba {user.display_name},\n\n"
-                f"{total_label} toplam harcaman: {total_minor / 100:,.2f} TL\n\n"
-                f"Kategori özeti:\n{breakdown}\n\n"
-                "Accountant"
+            subject=f"{day_label} {format_lira(total_minor)} harcadın",
+            message=MailMessage(
+                greeting=f"Merhaba {user.display_name},",
+                figure=MailFigure(
+                    label=f"{total_label} toplam harcaman",
+                    value=format_lira(total_minor),
+                ),
+                rows_title="Kategori özeti" if rows else None,
+                rows=rows,
+                paragraphs=(
+                    ()
+                    if rows
+                    else ("Bugün için kayıtlı bir gider bulunmuyor.",)
+                ),
             ),
         )
         self._deliveries.mark_delivered(

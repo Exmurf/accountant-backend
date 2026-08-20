@@ -2,9 +2,11 @@ from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
+from app.application.notifications.message import MailMessage
+
 
 class MailSender(Protocol):
-    def send(self, recipient: str, subject: str, text_body: str) -> None: ...
+    def send(self, recipient: str, subject: str, message: MailMessage) -> None: ...
 
 
 class NotificationDeliveryRepository(Protocol):

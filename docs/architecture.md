@@ -193,6 +193,17 @@ directly with Gmail SMTP and Python's standard `smtplib`; no external email
 delivery provider is used. The scheduler runs as a single application process
 to avoid duplicate jobs.
 
+A use case builds a `MailMessage` — a greeting, paragraphs, one headline
+figure, rows, an action and a notice — and never any markup. The mail adapter
+turns that into the text and the markup halves of a `multipart/alternative`
+message, so changing the template never reaches into a business rule, and a use
+case never has to know that Outlook still renders with Word. Layout is tables
+with inline styles for the same reason: no client can be relied on to keep a
+stylesheet, and none of them support flexbox. Everything a reader supplies is
+escaped, since a display name and a category name are theirs to choose. An
+action always prints its link as text underneath, because clients strip buttons
+and people forward these to a machine where the link gets copied by hand.
+
 A summary covers a day, not a moment, so the sweep looks back a few days and
 sends any day that has no delivery recorded yet, oldest first. Only today was
 ever considered before, which meant a night with the service stopped lost that

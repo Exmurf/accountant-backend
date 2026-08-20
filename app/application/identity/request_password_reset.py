@@ -6,6 +6,7 @@ from app.application.identity.ports import (
     RefreshTokenService,
     UserRepository,
 )
+from app.application.notifications.message import MailAction, MailMessage
 from app.application.notifications.ports import MailSender
 
 
@@ -59,15 +60,18 @@ class RequestPasswordReset:
         self._mailer.send(
             recipient=user.email,
             subject="Accountant şifre sıfırlama",
-            text_body=(
-                f"Merhaba {user.display_name},\n\n"
-                "Hesabının şifresini sıfırlamak için bir istek aldık. "
-                f"Aşağıdaki bağlantı {validity} geçerli ve yalnızca bir kez "
-                "kullanılabilir:\n\n"
-                f"{link}\n\n"
-                "Bu isteği sen yapmadıysan yapman gereken bir şey yok; "
-                "şifren değişmedi.\n\n"
-                "Accountant"
+            message=MailMessage(
+                greeting=f"Merhaba {user.display_name},",
+                paragraphs=(
+                    "Hesabının şifresini sıfırlamak için bir istek aldık. "
+                    f"Aşağıdaki bağlantı {validity} geçerli ve yalnızca bir kez "
+                    "kullanılabilir.",
+                ),
+                action=MailAction(label="Şifremi sıfırla", url=link),
+                footnote=(
+                    "Bu isteği sen yapmadıysan yapman gereken bir şey yok; "
+                    "şifren değişmedi."
+                ),
             ),
         )
         return True

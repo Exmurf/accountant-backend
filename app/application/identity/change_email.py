@@ -14,6 +14,7 @@ from app.application.identity.ports import (
     RefreshTokenService,
     UserRepository,
 )
+from app.application.notifications.message import MailAction, MailMessage
 from app.application.notifications.ports import MailSender
 from app.domain.identity.user import User
 
@@ -87,16 +88,19 @@ class RequestEmailChange:
         self._mailer.send(
             recipient=normalized,
             subject="Accountant e-posta adresi doğrulama",
-            text_body=(
-                f"Merhaba {user.display_name},\n\n"
-                f"Accountant hesabının e-posta adresini {user.email} yerine bu "
-                "adres olarak değiştirmek istedin. Onaylamak için aşağıdaki "
-                f"bağlantıya tıkla. Bağlantı {validity} geçerli ve yalnızca bir "
-                "kez kullanılabilir:\n\n"
-                f"{link}\n\n"
-                "Bu isteği sen yapmadıysan bu maili yok sayabilirsin; "
-                "onaylanmadığı sürece hiçbir şey değişmez.\n\n"
-                "Accountant"
+            message=MailMessage(
+                greeting=f"Merhaba {user.display_name},",
+                paragraphs=(
+                    f"Accountant hesabının e-posta adresini {user.email} "
+                    "yerine bu adres olarak değiştirmek istedin. Onaylamak "
+                    f"için aşağıdaki düğmeye bas. Bağlantı {validity} geçerli "
+                    "ve yalnızca bir kez kullanılabilir.",
+                ),
+                action=MailAction(label="Adresimi doğrula", url=link),
+                footnote=(
+                    "Bu isteği sen yapmadıysan bu maili yok sayabilirsin; "
+                    "onaylanmadığı sürece hiçbir şey değişmez."
+                ),
             ),
         )
         return normalized
@@ -112,14 +116,17 @@ def warn_previous_address(mailer: MailSender, user: User, new_email: str) -> Non
     mailer.send(
         recipient=user.email,
         subject="Accountant hesabının e-posta adresi değiştiriliyor",
-        text_body=(
-            f"Merhaba {user.display_name},\n\n"
-            "Accountant hesabının e-posta adresinin "
-            f"{new_email} olarak değiştirilmesi istendi. Değişiklik, yeni "
-            "adrese gönderilen bağlantı onaylanana kadar geçerli olmaz.\n\n"
-            "Bu isteği sen yapmadıysan şifreni hemen değiştir: isteği yapan "
-            "kişi şifreni biliyor.\n\n"
-            "Accountant"
+        message=MailMessage(
+            greeting=f"Merhaba {user.display_name},",
+            paragraphs=(
+                "Accountant hesabının e-posta adresinin "
+                f"{new_email} olarak değiştirilmesi istendi. Değişiklik, yeni "
+                "adrese gönderilen bağlantı onaylanana kadar geçerli olmaz.",
+            ),
+            notice=(
+                "Bu isteği sen yapmadıysan şifreni hemen değiştir: isteği "
+                "yapan kişi şifreni biliyor."
+            ),
         ),
     )
 
@@ -176,12 +183,13 @@ def announce_address_change(
     mailer.send(
         recipient=previous_email,
         subject="Accountant hesabının e-posta adresi değişti",
-        text_body=(
-            f"Merhaba {user.display_name},\n\n"
-            "Accountant hesabının e-posta adresi "
-            f"{user.email} olarak değiştirildi. Bundan sonra giriş ve şifre "
-            "sıfırlama işlemleri yeni adres üzerinden yapılacak.\n\n"
-            "Bu değişikliği sen yapmadıysan bize ulaş.\n\n"
-            "Accountant"
+        message=MailMessage(
+            greeting=f"Merhaba {user.display_name},",
+            paragraphs=(
+                "Accountant hesabının e-posta adresi "
+                f"{user.email} olarak değiştirildi. Bundan sonra giriş ve "
+                "şifre sıfırlama işlemleri yeni adres üzerinden yapılacak.",
+            ),
+            notice="Bu değişikliği sen yapmadıysan bize ulaş.",
         ),
     )

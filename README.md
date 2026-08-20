@@ -64,3 +64,27 @@ active user after that user's selected local time and one warning when a
 category first exceeds its monthly limit. New users default to 21:00 and can
 change the time from the application settings. Example-domain accounts are
 skipped.
+
+Paste the app password without the spaces Google shows it with. Docker Compose
+passes `env_file` values through untouched, so a stray trailing space becomes
+part of the password and Gmail answers `535 Authentication failed`.
+
+## Rate limiting
+
+Sign-in, registration and password change are limited per source address, and
+sign-in additionally per email address. Only failed sign-ins count, so a
+correct password never costs a user their quota and clears the account's
+counter. Exceeding a limit answers `429` with a `Retry-After` header. The
+defaults below can be tuned in `.env`, and `RATE_LIMIT_ENABLED=false` turns the
+whole mechanism off for local work.
+
+```env
+LOGIN_MAX_ATTEMPTS=5          # per email, per window
+LOGIN_IP_MAX_ATTEMPTS=30      # per source address, per window
+LOGIN_WINDOW_SECONDS=900
+REGISTER_MAX_ATTEMPTS=5
+REGISTER_WINDOW_SECONDS=3600
+```
+
+The counters are held in the API process, so restarting it clears every
+outstanding lockout.

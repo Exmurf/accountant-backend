@@ -67,6 +67,25 @@ fifteen minutes. Because a JWT `iat` is a whole number of seconds, the marker is
 stored at the same resolution and the session that made the change keeps the
 token it was just handed.
 
+Sign-in, registration and password change are rate limited in the API process.
+Sign-in counts only failures, so repeatedly signing in successfully never costs
+a user their quota, and a correct password clears the account's counter. Two
+keys are held at once: one per email address, which catches guessing spread
+across many source addresses, and a wider one per source address, which catches
+one caller scanning many accounts. A correct password clears only the account
+key, so signing in cannot wipe a scan run from the same address. An unknown
+address and a wrong password are indistinguishable to the caller, so the limit
+cannot be read as an answer to whether an account exists. Password change is
+keyed by user because reaching it already requires a session.
+
+The window lives in memory rather than in PostgreSQL. One process serves the
+API, so a process-local count is enough, and a restart forgiving outstanding
+lockouts is the safe direction for a mechanism that can shut a real user out of
+their own account. `X-Forwarded-For` is deliberately ignored: nothing in front
+of this service is trusted to set it, and honouring a caller-controlled header
+would let an attacker rotate their own key. A trusted-proxy list belongs here
+before the service runs behind a reverse proxy.
+
 ## Financial rules
 
 - Monetary values are stored as integer minor units (kuruş), never floating point.

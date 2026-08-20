@@ -75,15 +75,25 @@ cannot deactivate their own account.
 
 ## 6. Enabling mail
 
-Delivery code and per-user send times are done. Connecting a real Gmail account
-is an operations step: it needs a Gmail address and a Google App Password in
-`.env`, never the account's normal password. See the README.
+- [x] Gmail account connected and verified end to end
+
+Delivery code and per-user send times were already done; connecting the account
+was an operations step. A dedicated Gmail address and a Google App Password sit
+in `.env`, never the account's normal password. See the README. Addresses on
+`example.com` are skipped, so the seeded demo users receive nothing until they
+are given real addresses.
 
 ## 7. Hardening
 
 - [x] Password change
-- [ ] Password reset — needs a connected Gmail account, see phase 6
+- [x] Rate limiting on sign-in, registration and password change
+- [ ] Password reset — phase 6 is done, so this is no longer blocked
 - [ ] Email change
 - [ ] HTTPS and production setup
 - [ ] Backups and error logs
 - [ ] Mobile and visual pass
+
+Sign-in counts failures rather than requests, against an email key and a wider
+source-address key. The counters live in the API process, so they reset when it
+restarts; that is intentional for now and is the piece to revisit if the service
+is ever run as more than one process.

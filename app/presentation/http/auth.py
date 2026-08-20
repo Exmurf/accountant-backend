@@ -1,6 +1,14 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import (
+    APIRouter,
+    Cookie,
+    Depends,
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -18,6 +26,7 @@ from app.application.identity.refresh_session import RefreshSession
 from app.application.identity.register_user import RegisterUser
 from app.application.identity.revoke_session import RevokeSession
 from app.application.identity.update_settings import UpdateUserSettings
+from app.application.security.ports import RateLimiter
 from app.core.config import get_settings
 from app.domain.identity.user import User
 from app.infrastructure.database.repositories.refresh_tokens import (
@@ -31,6 +40,11 @@ from app.presentation.dependencies.auth import (
     ACCESS_COOKIE_NAME,
     get_current_user,
 )
+from app.presentation.dependencies.rate_limit import (
+    client_address,
+    enforce,
+    get_rate_limiter,
+)
 from app.presentation.schemas.auth import (
     ChangePasswordRequest,
     LoginRequest,
@@ -42,6 +56,9 @@ from app.presentation.schemas.auth import (
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 REFRESH_COOKIE_NAME = "accountant_refresh"
+TOO_MANY_LOGINS = "Çok fazla başarısız giriş denemesi."
+TOO_MANY_REGISTRATIONS = "Çok fazla kayıt denemesi."
+TOO_MANY_PASSWORD_ATTEMPTS = "Çok fazla başarısız şifre denemesi."
 
 
 def issue_session(response: Response, user: User, session: Session) -> None:
@@ -93,9 +110,24 @@ def clear_session_cookies(response: Response) -> None:
 )
 def register(
     payload: RegisterRequest,
+    request: Request,
     response: Response,
     session: Annotated[Session, Depends(get_database_session)],
+    limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
 ) -> UserResponse:
+    settings = get_settings()
+    if settings.rate_limit_enabled:
+        address_key = f"register:ip:{client_address(request)}"
+        enforce(
+            limiter.peek(
+                address_key,
+                settings.register_max_attempts,
+                settings.register_window_seconds,
+            ),
+            TOO_MANY_REGISTRATIONS,
+        )
+        limiter.record(address_key, settings.register_window_seconds)
+
     use_case = RegisterUser(
         SqlAlchemyUserRepository(session),
         Argon2PasswordHasher(),
@@ -119,16 +151,48 @@ def register(
 @router.post("/login", response_model=UserResponse)
 def login(
     payload: LoginRequest,
+    request: Request,
     response: Response,
     session: Annotated[Session, Depends(get_database_session)],
+    limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
 ) -> UserResponse:
+    settings = get_settings()
+    # Normalised exactly as the use case does it, so an account cannot be
+    # handed a fresh budget by varying the capitalisation of its address.
+    email = str(payload.email).strip().lower()
+    email_key = f"login:email:{email}"
+    address_key = f"login:ip:{client_address(request)}"
+
+    if settings.rate_limit_enabled:
+        enforce(
+            limiter.peek(
+                address_key,
+                settings.login_ip_max_attempts,
+                settings.login_window_seconds,
+            ),
+            TOO_MANY_LOGINS,
+        )
+        enforce(
+            limiter.peek(
+                email_key,
+                settings.login_max_attempts,
+                settings.login_window_seconds,
+            ),
+            TOO_MANY_LOGINS,
+        )
+
     use_case = LoginUser(
         SqlAlchemyUserRepository(session),
         Argon2PasswordHasher(),
     )
     try:
-        user = use_case.execute(str(payload.email), payload.password)
+        user = use_case.execute(email, payload.password)
     except InvalidCredentialsError:
+        # An unknown address and a wrong password raise the same error, so
+        # the counter cannot be read as an answer to whether an account exists.
+        if settings.rate_limit_enabled:
+            limiter.record(address_key, settings.login_window_seconds)
+            limiter.record(email_key, settings.login_window_seconds)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="E-posta veya şifre hatalı.",
@@ -138,6 +202,12 @@ def login(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Kullanıcı hesabı devre dışı.",
         ) from None
+
+    if settings.rate_limit_enabled:
+        # The right password clears the account's budget but not the caller's:
+        # signing in to your own account must not wipe a scan of other
+        # accounts run from the same address.
+        limiter.reset(email_key)
 
     issue_session(response, user, session)
     return UserResponse.from_domain(user)
@@ -208,7 +278,23 @@ def change_password(
     response: Response,
     session: Annotated[Session, Depends(get_database_session)],
     user: Annotated[User, Depends(get_current_user)],
+    limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
 ) -> UserResponse:
+    # This endpoint takes the current password too, so it is one more place
+    # a password can be guessed. It is keyed by user rather than by address
+    # because reaching it already requires a session.
+    settings = get_settings()
+    password_key = f"password:user:{user.id}"
+    if settings.rate_limit_enabled:
+        enforce(
+            limiter.peek(
+                password_key,
+                settings.login_max_attempts,
+                settings.login_window_seconds,
+            ),
+            TOO_MANY_PASSWORD_ATTEMPTS,
+        )
+
     try:
         updated_user = ChangePassword(
             users=SqlAlchemyUserRepository(session),
@@ -220,6 +306,8 @@ def change_password(
             new_password=payload.new_password,
         )
     except InvalidCredentialsError:
+        if settings.rate_limit_enabled:
+            limiter.record(password_key, settings.login_window_seconds)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Mevcut şifren hatalı.",
@@ -229,6 +317,9 @@ def change_password(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Yeni şifren mevcut şifrenden farklı olmalı.",
         ) from None
+
+    if settings.rate_limit_enabled:
+        limiter.reset(password_key)
 
     # Every refresh token was just revoked, so this session needs a fresh one.
     issue_session(response, updated_user, session)

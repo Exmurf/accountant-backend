@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
     app_timezone: str = "Europe/Istanbul"
 
+    rate_limit_enabled: bool = True
+    login_max_attempts: int = Field(default=5, ge=1)
+    login_ip_max_attempts: int = Field(default=30, ge=1)
+    login_window_seconds: int = Field(default=900, ge=1)
+    register_max_attempts: int = Field(default=5, ge=1)
+    register_window_seconds: int = Field(default=3600, ge=1)
+
     mail_username: str = ""
     mail_app_password: str = ""
     mail_from_name: str = "Accountant"

@@ -101,26 +101,27 @@ class RequestEmailChange:
         )
         return normalized
 
-    def warn_previous_address(self, user: User, new_email: str) -> None:
-        """Tell the address being left behind, without giving it the link.
 
-        Its job is to let the rightful owner notice a change they did not ask
-        for. A link here would hand an attacker who only has the old mailbox
-        exactly what they lack.
-        """
-        self._mailer.send(
-            recipient=user.email,
-            subject="Accountant hesabının e-posta adresi değiştiriliyor",
-            text_body=(
-                f"Merhaba {user.display_name},\n\n"
-                "Accountant hesabının e-posta adresinin "
-                f"{new_email} olarak değiştirilmesi istendi. Değişiklik, yeni "
-                "adrese gönderilen bağlantı onaylanana kadar geçerli olmaz.\n\n"
-                "Bu isteği sen yapmadıysan şifreni hemen değiştir: isteği yapan "
-                "kişi şifreni biliyor.\n\n"
-                "Accountant"
-            ),
-        )
+def warn_previous_address(mailer: MailSender, user: User, new_email: str) -> None:
+    """Tell the address being left behind, without giving it the link.
+
+    Its job is to let the rightful owner notice a change they did not ask for.
+    A link here would hand an attacker who only has the old mailbox exactly what
+    they lack.
+    """
+    mailer.send(
+        recipient=user.email,
+        subject="Accountant hesabının e-posta adresi değiştiriliyor",
+        text_body=(
+            f"Merhaba {user.display_name},\n\n"
+            "Accountant hesabının e-posta adresinin "
+            f"{new_email} olarak değiştirilmesi istendi. Değişiklik, yeni "
+            "adrese gönderilen bağlantı onaylanana kadar geçerli olmaz.\n\n"
+            "Bu isteği sen yapmadıysan şifreni hemen değiştir: isteği yapan "
+            "kişi şifreni biliyor.\n\n"
+            "Accountant"
+        ),
+    )
 
 
 class ConfirmEmailChange:
@@ -129,12 +130,10 @@ class ConfirmEmailChange:
         users: UserRepository,
         change_tokens: EmailChangeTokenRepository,
         token_service: RefreshTokenService,
-        mailer: MailSender,
     ) -> None:
         self._users = users
         self._change_tokens = change_tokens
         self._token_service = token_service
-        self._mailer = mailer
 
     def execute(self, token: str) -> tuple[User, str]:
         now = datetime.now(UTC)
@@ -162,22 +161,27 @@ class ConfirmEmailChange:
         # hands.
         return updated, previous_email
 
-    def notify_previous_address(self, user: User, previous_email: str) -> None:
-        """Told after the fact, and never in the request itself.
 
-        The address has already moved by the time this runs, so a refused SMTP
-        connection must not turn a change that worked into an error the reader
-        cannot act on.
-        """
-        self._mailer.send(
-            recipient=previous_email,
-            subject="Accountant hesabının e-posta adresi değişti",
-            text_body=(
-                f"Merhaba {user.display_name},\n\n"
-                "Accountant hesabının e-posta adresi "
-                f"{user.email} olarak değiştirildi. Bundan sonra giriş ve şifre "
-                "sıfırlama işlemleri yeni adres üzerinden yapılacak.\n\n"
-                "Bu değişikliği sen yapmadıysan bize ulaş.\n\n"
-                "Accountant"
-            ),
-        )
+def announce_address_change(
+    mailer: MailSender,
+    user: User,
+    previous_email: str,
+) -> None:
+    """Told after the fact, and never inside the request itself.
+
+    The address has already moved by the time this runs, so a refused SMTP
+    connection must not turn a change that worked into an error the reader
+    cannot act on.
+    """
+    mailer.send(
+        recipient=previous_email,
+        subject="Accountant hesabının e-posta adresi değişti",
+        text_body=(
+            f"Merhaba {user.display_name},\n\n"
+            "Accountant hesabının e-posta adresi "
+            f"{user.email} olarak değiştirildi. Bundan sonra giriş ve şifre "
+            "sıfırlama işlemleri yeni adres üzerinden yapılacak.\n\n"
+            "Bu değişikliği sen yapmadıysan bize ulaş.\n\n"
+            "Accountant"
+        ),
+    )

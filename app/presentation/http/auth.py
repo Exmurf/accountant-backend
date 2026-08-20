@@ -51,7 +51,11 @@ from app.infrastructure.database.repositories.refresh_tokens import (
 from app.infrastructure.database.repositories.users import SqlAlchemyUserRepository
 from app.infrastructure.database.session import get_database_session
 from app.infrastructure.security.passwords import Argon2PasswordHasher
-from app.infrastructure.identity.runtime import deliver_password_reset
+from app.infrastructure.identity.runtime import (
+    deliver_email_change_notice,
+    deliver_email_change_warning,
+    deliver_password_reset,
+)
 from app.infrastructure.mail.smtp import SmtpMailSender
 from app.infrastructure.security.tokens import (
     EmailChangeTokenService,
@@ -523,7 +527,7 @@ def change_email(
 
     # A courtesy to whoever holds the old mailbox, and not worth failing the
     # request over: the confirmation link has already been sent.
-    background_tasks.add_task(use_case.warn_previous_address, user, new_email)
+    background_tasks.add_task(deliver_email_change_warning, user, new_email)
     return EmailChangeRequestedResponse()
 
 
@@ -549,14 +553,12 @@ def confirm_email_change(
             TOO_MANY_EMAIL_CHANGES,
         )
 
-    use_case = ConfirmEmailChange(
-        users=SqlAlchemyUserRepository(session),
-        change_tokens=SqlAlchemyEmailChangeTokenRepository(session),
-        token_service=EmailChangeTokenService(),
-        mailer=SmtpMailSender(settings),
-    )
     try:
-        updated_user, previous_email = use_case.execute(payload.token)
+        updated_user, previous_email = ConfirmEmailChange(
+            users=SqlAlchemyUserRepository(session),
+            change_tokens=SqlAlchemyEmailChangeTokenRepository(session),
+            token_service=EmailChangeTokenService(),
+        ).execute(payload.token)
     except InvalidEmailChangeTokenError:
         if settings.rate_limit_enabled:
             limiter.record(address_key, settings.login_window_seconds)
@@ -577,7 +579,7 @@ def confirm_email_change(
         ) from None
 
     background_tasks.add_task(
-        use_case.notify_previous_address,
+        deliver_email_change_notice,
         updated_user,
         previous_email,
     )

@@ -1,7 +1,12 @@
 import logging
 
+from app.application.identity.change_email import (
+    announce_address_change,
+    warn_previous_address,
+)
 from app.application.identity.request_password_reset import RequestPasswordReset
 from app.core.config import get_settings
+from app.domain.identity.user import User
 from app.infrastructure.database.repositories.password_resets import (
     SqlAlchemyPasswordResetTokenRepository,
 )
@@ -42,3 +47,34 @@ def deliver_password_reset(email: str) -> None:
             ).execute(email)
     except Exception:
         logger.exception("Password reset mail could not be sent")
+
+
+def deliver_email_change_warning(user: User, new_email: str) -> None:
+    """Warn the address being left behind, after the response has gone out.
+
+    Like every other mail the application sends on its own, a refused SMTP
+    connection is written to the log and goes no further: the caller has already
+    been answered, and the confirmation link they need was sent before this.
+    """
+    settings = get_settings()
+    if not settings.mail_enabled:
+        return
+    try:
+        warn_previous_address(SmtpMailSender(settings), user, new_email)
+    except Exception:
+        logger.exception("Email change warning could not be sent")
+
+
+def deliver_email_change_notice(user: User, previous_email: str) -> None:
+    """Tell the old address the move is done, after the response has gone out.
+
+    The address has already changed by the time this runs, so failing here must
+    not be mistaken for the change itself failing.
+    """
+    settings = get_settings()
+    if not settings.mail_enabled:
+        return
+    try:
+        announce_address_change(SmtpMailSender(settings), user, previous_email)
+    except Exception:
+        logger.exception("Email change notice could not be sent")

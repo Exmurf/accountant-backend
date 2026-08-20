@@ -11,12 +11,15 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-accountant}:${POSTGRES_PASSWORD:-accountant_dev_password}@postgres:5432/${POSTGRES_DB:-accountant}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     ports:
       - '3001:3001'
     volumes:
       - .:/app
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test:
@@ -26,6 +29,21 @@ services:
           '-c',
           "import urllib.request; urllib.request.urlopen('http://localhost:3001/api/v1/health')",
         ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    container_name: accountant-redis
+    restart: unless-stopped
+    # Nothing here is the source of truth, so persistence is off on purpose: a
+    # lost cache costs one query, while an fsync on every write costs latency.
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    ports:
+      - '127.0.0.1:6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 5s
       retries: 10

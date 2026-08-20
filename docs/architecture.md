@@ -122,6 +122,33 @@ never going to arrive. The address is checked again when the link is followed,
 since it was only free at the moment the mail was sent, and the unique index on
 `users.email` has the last word.
 
+## Caching
+
+Ledger reads go through a cache before PostgreSQL, and a write invalidates by
+bumping a version number folded into the key rather than deleting anything.
+Deleting everything one user touched would mean scanning the keyspace for a
+pattern, which Redis walks key by key; a version turns the same job into one
+INCR, and the entries nobody will read again fall out when their time expires.
+
+Invalidation is driven by SQLAlchemy session events rather than by each
+repository remembering to ask, so a write through any path is caught. It fires
+after the commit, not during the flush: doing it earlier leaves a window where
+a concurrent reader still sees the old rows, misses, and stores what it read
+under the version meant to replace it, which is the one shape of this bug that
+does not heal on its own. A rolled-back flush invalidates nothing.
+
+A cached transaction carries the name and colour of its category, so editing a
+category invalidates too — the owner's namespace for a custom one, and every
+namespace for a shared default.
+
+Nothing here is a source of truth. Every call may fail, and when it does the
+read falls through to PostgreSQL, so an unreachable cache costs a query rather
+than an error. Timeouts are a quarter of a second, because a cache that hangs
+is worse than no cache at all, and an outage is logged once rather than once
+per call. With no `REDIS_URL` configured the application runs on a cache that
+misses everything, which keeps the uncached path identical to the cached one
+instead of leaving it to rot behind a conditional.
+
 ## Financial rules
 
 - Monetary values are stored as integer minor units (kuruş), never floating point.

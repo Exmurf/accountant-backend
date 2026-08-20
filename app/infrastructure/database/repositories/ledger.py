@@ -6,6 +6,7 @@ from sqlalchemy import case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
+from app.application.caching.ports import Cache
 from app.application.ledger.errors import (
     BudgetAlreadyExistsError,
     CategoryAlreadyExistsError,
@@ -18,6 +19,14 @@ from app.domain.ledger.models import (
     TransactionKind,
 )
 from app.domain.ledger.subscription import Subscription
+from app.infrastructure.cache.factory import get_cache
+from app.infrastructure.cache.keys import ledger_namespace
+from app.infrastructure.cache.serialization import (
+    dump_balance,
+    dump_transactions,
+    load_balance,
+    load_transactions,
+)
 from app.infrastructure.database.models.ledger import (
     CategoryModel,
     MonthlyBudgetModel,
@@ -123,10 +132,22 @@ class SqlAlchemyCategoryRepository:
 
 
 class SqlAlchemyTransactionRepository:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, cache: Cache | None = None) -> None:
         self._session = session
+        self._cache = get_cache() if cache is None else cache
 
     def get_balance(self, user_id: UUID, before: datetime) -> AccountBalance:
+        namespace = ledger_namespace(user_id)
+        key = f"balance:{before.isoformat()}"
+        cached = self._cache.read(namespace, key)
+        if cached is not None:
+            return load_balance(cached)
+
+        balance = self._query_balance(user_id, before)
+        self._cache.write(namespace, key, dump_balance(balance))
+        return balance
+
+    def _query_balance(self, user_id: UUID, before: datetime) -> AccountBalance:
         total_income, total_expense = self._session.execute(
             select(
                 func.coalesce(
@@ -172,6 +193,30 @@ class SqlAlchemyTransactionRepository:
         end: datetime,
         category_id: UUID | None = None,
         kind: TransactionKind | None = None,
+    ) -> list[Transaction]:
+        namespace = ledger_namespace(user_id)
+        # The arguments are the query, so they are the key. They are short and
+        # readable on purpose: a key you can eyeball in redis-cli is worth more
+        # here than a few saved bytes.
+        key = (
+            f"list:{start.isoformat()}:{end.isoformat()}"
+            f":{category_id or '-'}:{kind.value if kind else '-'}"
+        )
+        cached = self._cache.read(namespace, key)
+        if cached is not None:
+            return load_transactions(cached)
+
+        transactions = self._query_for_user(user_id, start, end, category_id, kind)
+        self._cache.write(namespace, key, dump_transactions(transactions))
+        return transactions
+
+    def _query_for_user(
+        self,
+        user_id: UUID,
+        start: datetime,
+        end: datetime,
+        category_id: UUID | None,
+        kind: TransactionKind | None,
     ) -> list[Transaction]:
         query = (
             select(TransactionModel)

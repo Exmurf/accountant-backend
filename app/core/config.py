@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     email_change_window_seconds: int = Field(default=3600, ge=1)
     email_change_token_minutes: int = Field(default=60, ge=1)
 
+    redis_url: str = ""
+    cache_ttl_seconds: int = Field(default=300, ge=1)
+
     mail_username: str = ""
     mail_app_password: str = ""
     mail_from_name: str = "Accountant"

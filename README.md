@@ -77,6 +77,21 @@ Paste the app password without the spaces Google shows it with. Docker Compose
 passes `env_file` values through untouched, so a stray trailing space becomes
 part of the password and Gmail answers `535 Authentication failed`.
 
+## Caching
+
+Docker Compose starts Redis alongside PostgreSQL and the API. Ledger reads are
+served from it and invalidated automatically when anything is written, so
+nothing has to be cleared by hand.
+
+```env
+REDIS_URL=redis://localhost:6379/0
+CACHE_TTL_SECONDS=300
+```
+
+Leave `REDIS_URL` empty to run without a cache; every read then goes straight
+to PostgreSQL and the application behaves the same way. Redis being down is not
+an outage either — reads fall through and one warning is written to the log.
+
 ## Rate limiting
 
 Sign-in, registration and password change are limited per source address, and

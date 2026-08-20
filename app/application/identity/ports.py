@@ -2,6 +2,7 @@ from datetime import datetime, time
 from typing import Protocol
 from uuid import UUID
 
+from app.domain.identity.email_change import PendingEmailChange
 from app.domain.identity.session import AccessTokenClaims
 from app.domain.identity.user import User
 
@@ -28,6 +29,8 @@ class UserRepository(Protocol):
 
     def update_password(self, user_id: UUID, password_hash: str) -> User | None: ...
 
+    def update_email(self, user_id: UUID, email: str) -> User | None: ...
+
 
 class PasswordHasher(Protocol):
     def hash(self, password: str) -> str: ...
@@ -45,6 +48,23 @@ class RefreshTokenService(Protocol):
     def create(self) -> str: ...
 
     def hash(self, token: str) -> str: ...
+
+
+class EmailChangeTokenRepository(Protocol):
+    def replace_for_user(
+        self,
+        user_id: UUID,
+        new_email: str,
+        token_hash: str,
+        expires_at: datetime,
+        now: datetime,
+    ) -> None: ...
+
+    def consume(
+        self,
+        token_hash: str,
+        now: datetime,
+    ) -> PendingEmailChange | None: ...
 
 
 class PasswordResetTokenRepository(Protocol):

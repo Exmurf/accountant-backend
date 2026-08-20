@@ -15,11 +15,18 @@ from sqlalchemy.orm import Session
 
 from app.application.identity.errors import (
     EmailAlreadyRegisteredError,
+    EmailUnchangedError,
     InactiveUserError,
     InvalidCredentialsError,
+    InvalidEmailChangeTokenError,
     InvalidPasswordResetTokenError,
     InvalidRefreshTokenError,
     PasswordUnchangedError,
+    UnreachableEmailError,
+)
+from app.application.identity.change_email import (
+    ConfirmEmailChange,
+    RequestEmailChange,
 )
 from app.application.identity.change_password import ChangePassword
 from app.application.identity.issue_session import IssueSession
@@ -32,6 +39,9 @@ from app.application.identity.update_settings import UpdateUserSettings
 from app.application.security.ports import RateLimiter
 from app.core.config import get_settings
 from app.domain.identity.user import User
+from app.infrastructure.database.repositories.email_changes import (
+    SqlAlchemyEmailChangeTokenRepository,
+)
 from app.infrastructure.database.repositories.password_resets import (
     SqlAlchemyPasswordResetTokenRepository,
 )
@@ -42,7 +52,9 @@ from app.infrastructure.database.repositories.users import SqlAlchemyUserReposit
 from app.infrastructure.database.session import get_database_session
 from app.infrastructure.security.passwords import Argon2PasswordHasher
 from app.infrastructure.identity.runtime import deliver_password_reset
+from app.infrastructure.mail.smtp import SmtpMailSender
 from app.infrastructure.security.tokens import (
+    EmailChangeTokenService,
     JwtTokenService,
     OpaqueRefreshTokenService,
     PasswordResetTokenService,
@@ -57,7 +69,10 @@ from app.presentation.dependencies.rate_limit import (
     get_rate_limiter,
 )
 from app.presentation.schemas.auth import (
+    ChangeEmailRequest,
     ChangePasswordRequest,
+    ConfirmEmailChangeRequest,
+    EmailChangeRequestedResponse,
     ForgotPasswordRequest,
     LoginRequest,
     LogoutResponse,
@@ -75,6 +90,7 @@ TOO_MANY_LOGINS = "Çok fazla başarısız giriş denemesi."
 TOO_MANY_REGISTRATIONS = "Çok fazla kayıt denemesi."
 TOO_MANY_PASSWORD_ATTEMPTS = "Çok fazla başarısız şifre denemesi."
 TOO_MANY_RESET_REQUESTS = "Çok fazla şifre sıfırlama isteği."
+TOO_MANY_EMAIL_CHANGES = "Çok fazla e-posta değiştirme isteği."
 
 
 def issue_session(response: Response, user: User, session: Session) -> None:
@@ -424,6 +440,140 @@ def change_password(
 
     # Every refresh token was just revoked, so this session needs a fresh one.
     issue_session(response, updated_user, session)
+    return UserResponse.from_domain(updated_user)
+
+
+@router.post(
+    "/email/change",
+    response_model=EmailChangeRequestedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def change_email(
+    payload: ChangeEmailRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: Annotated[Session, Depends(get_database_session)],
+    user: Annotated[User, Depends(get_current_user)],
+    limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
+) -> EmailChangeRequestedResponse:
+    settings = get_settings()
+    if not settings.mail_enabled:
+        # The whole flow turns on a link arriving somewhere, so there is nothing
+        # useful to do here without a configured sender.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="E-posta gönderimi yapılandırılmadığı için adres değiştirilemiyor.",
+        )
+
+    user_key = f"email-change:user:{user.id}"
+    address_key = f"email-change:ip:{client_address(request)}"
+    if settings.rate_limit_enabled:
+        for key in (address_key, user_key):
+            enforce(
+                limiter.peek(
+                    key,
+                    settings.email_change_max_attempts,
+                    settings.email_change_window_seconds,
+                ),
+                TOO_MANY_EMAIL_CHANGES,
+            )
+
+    use_case = RequestEmailChange(
+        users=SqlAlchemyUserRepository(session),
+        passwords=Argon2PasswordHasher(),
+        change_tokens=SqlAlchemyEmailChangeTokenRepository(session),
+        token_service=EmailChangeTokenService(),
+        mailer=SmtpMailSender(settings),
+        web_origin=settings.web_origin,
+        token_lifetime_minutes=settings.email_change_token_minutes,
+    )
+    try:
+        new_email = use_case.execute(
+            user=user,
+            new_email=str(payload.new_email),
+            current_password=payload.current_password,
+        )
+    except InvalidCredentialsError:
+        if settings.rate_limit_enabled:
+            limiter.record(address_key, settings.email_change_window_seconds)
+            limiter.record(user_key, settings.email_change_window_seconds)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Mevcut şifren hatalı.",
+        ) from None
+    except EmailUnchangedError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Bu zaten mevcut e-posta adresin.",
+        ) from None
+    except UnreachableEmailError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Bu alan adına e-posta gönderilemiyor.",
+        ) from None
+    except EmailAlreadyRegisteredError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bu e-posta adresi zaten kayıtlı.",
+        ) from None
+
+    if settings.rate_limit_enabled:
+        limiter.record(address_key, settings.email_change_window_seconds)
+        limiter.record(user_key, settings.email_change_window_seconds)
+
+    # A courtesy to whoever holds the old mailbox, and not worth failing the
+    # request over: the confirmation link has already been sent.
+    background_tasks.add_task(use_case.warn_previous_address, user, new_email)
+    return EmailChangeRequestedResponse()
+
+
+@router.post("/email/confirm", response_model=UserResponse)
+def confirm_email_change(
+    payload: ConfirmEmailChangeRequest,
+    request: Request,
+    session: Annotated[Session, Depends(get_database_session)],
+    limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
+) -> UserResponse:
+    # No session is required: the link is opened wherever the new mailbox
+    # is read, which is rarely the browser that asked for the change.
+    settings = get_settings()
+    address_key = f"email-confirm:ip:{client_address(request)}"
+    if settings.rate_limit_enabled:
+        enforce(
+            limiter.peek(
+                address_key,
+                settings.login_ip_max_attempts,
+                settings.login_window_seconds,
+            ),
+            TOO_MANY_EMAIL_CHANGES,
+        )
+
+    try:
+        updated_user, _ = ConfirmEmailChange(
+            users=SqlAlchemyUserRepository(session),
+            change_tokens=SqlAlchemyEmailChangeTokenRepository(session),
+            token_service=EmailChangeTokenService(),
+            mailer=SmtpMailSender(settings),
+        ).execute(payload.token)
+    except InvalidEmailChangeTokenError:
+        if settings.rate_limit_enabled:
+            limiter.record(address_key, settings.login_window_seconds)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Bağlantı geçersiz ya da süresi dolmuş. "
+                "Lütfen ayarlardan yeniden istek gönder."
+            ),
+        ) from None
+    except EmailAlreadyRegisteredError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Bu e-posta adresi sen onaylamadan önce başka bir hesaba "
+                "kaydedildi."
+            ),
+        ) from None
+
     return UserResponse.from_domain(updated_user)
 
 

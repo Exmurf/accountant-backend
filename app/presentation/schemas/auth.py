@@ -52,6 +52,15 @@ class ResetPasswordRequest(BaseModel):
     new_password: str = Field(min_length=8, max_length=128)
 
 
+class ChangeEmailRequest(BaseModel):
+    new_email: EmailStr
+    current_password: str = Field(min_length=8, max_length=128)
+
+
+class ConfirmEmailChangeRequest(BaseModel):
+    token: str = Field(min_length=16, max_length=512)
+
+
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(min_length=8, max_length=128)
     new_password: str = Field(min_length=8, max_length=128)
@@ -66,6 +75,13 @@ class UpdateUserSettingsRequest(BaseModel):
 
 class LogoutResponse(BaseModel):
     success: bool = True
+
+
+class EmailChangeRequestedResponse(BaseModel):
+    detail: str = (
+        "Doğrulama bağlantısı yeni adresine gönderildi. "
+        "Onaylayana kadar mevcut adresin geçerli kalır."
+    )
 
 
 class PasswordResetCompletedResponse(BaseModel):

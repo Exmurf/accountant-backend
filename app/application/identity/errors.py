@@ -20,3 +20,15 @@ class PasswordUnchangedError(Exception):
 
 class InvalidPasswordResetTokenError(Exception):
     pass
+
+
+class InvalidEmailChangeTokenError(Exception):
+    pass
+
+
+class EmailUnchangedError(Exception):
+    pass
+
+
+class UnreachableEmailError(Exception):
+    pass

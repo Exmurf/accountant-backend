@@ -110,3 +110,12 @@ The link is built from `WEB_ORIGIN`, so that value has to match the address the
 browser actually uses or the mail will point somewhere unreachable. Mail must be
 configured for any of this to work; without it the request is logged and
 dropped.
+
+## Changing an address
+
+`POST /auth/email/change` needs a session and the account's current password,
+and mails a confirmation link to the new address while telling the old one what
+was requested. Nothing changes until `POST /auth/email/confirm` spends the
+token, which the web app does on its own when it is opened with an
+`email_token` query parameter. An address already in use is refused outright,
+both when the change is asked for and again when the link is followed.

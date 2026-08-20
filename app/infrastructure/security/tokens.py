@@ -53,6 +53,10 @@ class OpaqueRefreshTokenService(OpaqueTokenService):
     pass
 
 
+class EmailChangeTokenService(OpaqueTokenService):
+    token_bytes = 48
+
+
 class PasswordResetTokenService(OpaqueTokenService):
     # This one travels in a link and is occasionally copied by hand, so it is
     # shorter than a refresh token while staying far outside guessing range.

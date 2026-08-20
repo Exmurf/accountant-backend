@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     password_reset_ip_max_attempts: int = Field(default=10, ge=1)
     password_reset_window_seconds: int = Field(default=3600, ge=1)
     password_reset_token_minutes: int = Field(default=60, ge=1)
+    email_change_max_attempts: int = Field(default=3, ge=1)
+    email_change_window_seconds: int = Field(default=3600, ge=1)
+    email_change_token_minutes: int = Field(default=60, ge=1)
 
     mail_username: str = ""
     mail_app_password: str = ""

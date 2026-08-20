@@ -88,7 +88,7 @@ are given real addresses.
 - [x] Password change
 - [x] Rate limiting on sign-in, registration and password change
 - [x] Password reset
-- [ ] Email change
+- [x] Email change
 - [ ] HTTPS and production setup
 - [ ] Backups and error logs
 - [ ] Mobile and visual pass

@@ -107,6 +107,27 @@ class SqlAlchemyUserRepository:
             return None
         return self._to_domain(persisted)
 
+    def update_email(self, user_id: UUID, email: str) -> User | None:
+        model = self._session.get(UserModel, user_id)
+        if model is None:
+            return None
+
+        model.email = email
+        try:
+            self._session.commit()
+        except IntegrityError as error:
+            # The address was free when the change was requested; somebody may
+            # have taken it while the mail sat unread.
+            self._session.rollback()
+            raise EmailAlreadyRegisteredError from error
+
+        persisted = self._session.scalar(
+            self._user_query().where(UserModel.id == user_id)
+        )
+        if persisted is None:
+            return None
+        return self._to_domain(persisted)
+
     def set_savings_goal(self, user_id: UUID, amount_minor: int) -> int | None:
         model = self._session.get(UserModel, user_id)
         if model is None:

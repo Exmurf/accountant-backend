@@ -105,6 +105,23 @@ issued for it. Following the link does not open a session: it proves the caller
 holds the mailbox, not that they are at a trusted device, so they sign in with
 the new password like anyone else.
 
+Changing an address works the same way and differs on purpose in three places.
+The confirmation link goes to the new address, because holding that mailbox is
+the only thing that proves it belongs to the person asking, and the address
+being left behind is told separately, without a link, so its owner notices a
+change they did not make. The current password is required: mail is the
+recovery channel, so a stolen session that could repoint it would become a
+permanent takeover. Sessions survive, because the password was proved when the
+change was asked for and nothing suggests the account is in the wrong hands.
+
+Whether the new address is already registered is stated plainly rather than
+hidden. Password reset has to stay silent because anyone may call it; this
+endpoint needs a session and is rate limited, so the lookup costs an account and
+a long wait, while staying quiet would leave somebody waiting on a mail that was
+never going to arrive. The address is checked again when the link is followed,
+since it was only free at the moment the mail was sent, and the unique index on
+`users.email` has the last word.
+
 ## Financial rules
 
 - Monetary values are stored as integer minor units (kuruş), never floating point.

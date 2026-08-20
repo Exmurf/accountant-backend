@@ -161,6 +161,30 @@ class PasswordResetTokenModel(Base):
     )
 
 
+class EmailChangeTokenModel(Base):
+    __tablename__ = "email_change_tokens"
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+    )
+    # The address is held here rather than on the user until it is confirmed,
+    # so an unfinished change never touches the account it belongs to.
+    new_email: Mapped[str] = mapped_column(String(320))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class RefreshTokenModel(Base):
     __tablename__ = "refresh_tokens"
 

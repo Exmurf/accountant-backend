@@ -531,6 +531,7 @@ def change_email(
 def confirm_email_change(
     payload: ConfirmEmailChangeRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     session: Annotated[Session, Depends(get_database_session)],
     limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
 ) -> UserResponse:
@@ -548,13 +549,14 @@ def confirm_email_change(
             TOO_MANY_EMAIL_CHANGES,
         )
 
+    use_case = ConfirmEmailChange(
+        users=SqlAlchemyUserRepository(session),
+        change_tokens=SqlAlchemyEmailChangeTokenRepository(session),
+        token_service=EmailChangeTokenService(),
+        mailer=SmtpMailSender(settings),
+    )
     try:
-        updated_user, _ = ConfirmEmailChange(
-            users=SqlAlchemyUserRepository(session),
-            change_tokens=SqlAlchemyEmailChangeTokenRepository(session),
-            token_service=EmailChangeTokenService(),
-            mailer=SmtpMailSender(settings),
-        ).execute(payload.token)
+        updated_user, previous_email = use_case.execute(payload.token)
     except InvalidEmailChangeTokenError:
         if settings.rate_limit_enabled:
             limiter.record(address_key, settings.login_window_seconds)
@@ -574,6 +576,11 @@ def confirm_email_change(
             ),
         ) from None
 
+    background_tasks.add_task(
+        use_case.notify_previous_address,
+        updated_user,
+        previous_email,
+    )
     return UserResponse.from_domain(updated_user)
 
 

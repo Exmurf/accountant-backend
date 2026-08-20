@@ -160,10 +160,15 @@ class ConfirmEmailChange:
         # Sessions survive: the password was proved when the change was asked
         # for, so there is nothing here to suggest the account is in the wrong
         # hands.
-        self._notify_previous_address(updated, previous_email)
         return updated, previous_email
 
-    def _notify_previous_address(self, user: User, previous_email: str) -> None:
+    def notify_previous_address(self, user: User, previous_email: str) -> None:
+        """Told after the fact, and never in the request itself.
+
+        The address has already moved by the time this runs, so a refused SMTP
+        connection must not turn a change that worked into an error the reader
+        cannot act on.
+        """
         self._mailer.send(
             recipient=previous_email,
             subject="Accountant hesabının e-posta adresi değişti",

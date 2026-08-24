@@ -3,7 +3,14 @@
 #   docker compose -f docker-compose.prod.yml up -d --build
 #
 # It expects the frontend repository checked out beside this one, because the
-# `web` image is built from it. See docs/deploy.md.
+# `web` image is built from it:
+#
+#   ~/accountant/accountant-backend    <- you are here
+#   ~/accountant/accountant-frontend
+#
+# SITE_ADDRESS, WEB_ORIGIN, POSTGRES_PASSWORD and JWT_SECRET_KEY come from .env,
+# which is not in this repository. Generate the two secrets with
+# `openssl rand -hex 32`.
 #
 # Every secret is written `${NAME:?...}` rather than given a fallback: a missing
 # value has to stop the stack, not start it with a password anyone can read in

@@ -1,0 +1,111 @@
+# Production stack. Brings up the whole application behind one origin:
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# It expects the frontend repository checked out beside this one, because the
+# `web` image is built from it. See docs/deploy.md.
+#
+# Every secret is written `${NAME:?...}` rather than given a fallback: a missing
+# value has to stop the stack, not start it with a password anyone can read in
+# this file.
+name: accountant
+
+services:
+  # Terminates TLS, serves the built frontend and hands /api to the backend.
+  # One origin means the session cookies are first-party and CORS never applies.
+  web:
+    build:
+      context: ../accountant-frontend
+      dockerfile: Dockerfile
+      target: serve
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?the hostname this is served on, e.g. paran.example.com}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      # Certificates live here. Losing this volume means asking Let's Encrypt
+      # for new ones, and its rate limits are weekly.
+      - accountant_caddy_data:/data
+      - accountant_caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-accountant}:${POSTGRES_PASSWORD:?a database password}@postgres:5432/${POSTGRES_DB:-accountant}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?a long random secret; changing it signs everyone out}
+      # Reset and email-change links are built from this, so a wrong value sends
+      # people somewhere that cannot read their token. A value in .env satisfies
+      # this guard, so the application checks the scheme again at startup.
+      WEB_ORIGIN: ${WEB_ORIGIN:?the public address, e.g. https://paran.example.com}
+      # Fixed rather than defaulted. Compose interpolation reads .env too, so a
+      # `${COOKIE_SECURE:-true}` here would let a development file quietly turn
+      # it off, and a session cookie that forgets to say HTTPS can be read off
+      # the wire.
+      COOKIE_SECURE: 'true'
+      # Docker's own address range. Only `web` can reach this service, and it is
+      # the one writing X-Forwarded-For.
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-172.16.0.0/12}
+    # No published port on purpose. The proxy reaches this over the compose
+    # network, and nothing else has any business reaching it at all.
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://localhost:3001/api/v1/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    # Nothing here is the source of truth, so persistence is off on purpose: a
+    # lost cache costs one query, while an fsync on every write costs latency.
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-accountant}
+      POSTGRES_USER: ${POSTGRES_USER:-accountant}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?a database password}
+    volumes:
+      - accountant_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  accountant_postgres_data:
+    name: accountant_prod_postgres_data
+  accountant_caddy_data:
+    name: accountant_prod_caddy_data
+  accountant_caddy_config:
+    name: accountant_prod_caddy_config

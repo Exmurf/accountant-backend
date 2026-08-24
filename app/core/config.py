@@ -1,6 +1,7 @@
 from functools import lru_cache
+from ipaddress import IPv4Network, IPv6Network, ip_network
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +14,10 @@ class Settings(BaseSettings):
 
     api_port: int = 3001
     web_origin: str = "http://localhost:3000"
+    # Addresses or CIDR blocks whose `X-Forwarded-For` may be believed. Empty
+    # means nothing is trusted, which is right whenever the service is reached
+    # directly. Behind a reverse proxy, name the proxy here.
+    trusted_proxy_ips: str = ""
     database_url: str = (
         "postgresql+psycopg://accountant:accountant_dev_password"
         "@localhost:5432/accountant"
@@ -48,9 +53,44 @@ class Settings(BaseSettings):
     mail_smtp_port: int = Field(default=587, ge=1, le=65535)
     daily_summary_catchup_days: int = Field(default=3, ge=0, le=31)
 
+    @model_validator(mode="after")
+    def _reject_unusable_cookie_scheme(self) -> "Settings":
+        """Refuse a secure cookie on a plain-HTTP origin.
+
+        The browser would never send the cookie back, so every login would
+        appear to succeed and then be forgotten. It is the shape a development
+        env file takes when it reaches a server, and a startup failure is far
+        cheaper to read than that symptom.
+        """
+        if self.cookie_secure and self.web_origin.startswith("http://"):
+            raise ValueError(
+                "COOKIE_SECURE is on but WEB_ORIGIN is plain http, so no session "
+                "cookie would ever come back. Serve the site over https, or turn "
+                "COOKIE_SECURE off for local work."
+            )
+        return self
+
     @property
     def mail_enabled(self) -> bool:
         return bool(self.mail_username and self.mail_app_password)
+
+    @property
+    def trusted_proxies(self) -> tuple[IPv4Network | IPv6Network, ...]:
+        """`trusted_proxy_ips` as networks. A bare address becomes a /32 or /128.
+
+        Unparseable entries are dropped rather than raised: a typo here should
+        narrow what is trusted, never keep the application from starting.
+        """
+        networks = []
+        for entry in self.trusted_proxy_ips.split(","):
+            entry = entry.strip()
+            if not entry:
+                continue
+            try:
+                networks.append(ip_network(entry, strict=False))
+            except ValueError:
+                continue
+        return tuple(networks)
 
 
 @lru_cache

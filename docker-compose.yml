@@ -7,6 +7,14 @@ services:
       dockerfile: Dockerfile
     container_name: accountant-backend
     restart: unless-stopped
+    # The image ships the production command; development trades it for the
+    # reloading one, which the bind mount below is what makes useful.
+    command:
+      [
+        'sh',
+        '-c',
+        'alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 3001 --reload',
+      ]
     env_file:
       - .env
     environment:

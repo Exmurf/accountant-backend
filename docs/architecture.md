@@ -11,6 +11,14 @@ Backend Docker Compose starts `accountant-backend` on port 3001 and
 Compose service name `postgres`. PostgreSQL data is stored in a named volume and
 survives `docker compose down`. The frontend has its own Docker project.
 
+## Production containers
+
+`docker-compose.prod.yml` runs the same services with the development
+affordances removed: no bind mount, no published database port, no reloading
+server. A fourth container fronts them with Caddy, which serves the built
+frontend and proxies `/api` to the API, so both halves share one origin and the
+session cookies are first-party. See `docs/deploy.md`.
+
 ## Backend dependency direction
 
 ```text

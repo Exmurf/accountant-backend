@@ -9,3 +9,4 @@ __pycache__/
 .turbo/
 *.log
 docs/
+.pytest_cache/

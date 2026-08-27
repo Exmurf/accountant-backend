@@ -5,6 +5,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # The image with pytest in it, so the suite runs where the application
+      # runs rather than against a second set of versions on the host.
+      target: dev
     container_name: accountant-backend
     restart: unless-stopped
     # The image ships the production command; development trades it for the

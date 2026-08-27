@@ -47,6 +47,49 @@ backend Docker Compose passes the same settings through container environment
 variables. The frontend is a separate repository and is not required to build
 or start this project.
 
+## Tests
+
+The development image carries the test runner, so the suite runs where the
+application runs:
+
+```bash
+docker compose exec backend pytest
+```
+
+It has two halves. The unit tests cover the use cases in `app/application`
+against in-memory stand-ins for their ports, need nothing running, and finish
+in under a second. The API tests go through HTTP with `TestClient` and need
+PostgreSQL, which is why they are marked:
+
+```bash
+docker compose exec backend pytest -m "not api"   # unit only
+docker compose exec backend pytest -m api         # HTTP only
+```
+
+They use a database of their own, named after the configured one with a `_test`
+suffix, created and migrated on first run. Every API test empties the tables
+first, so the suite refuses to start unless the name ends in `_test` — pointed
+at the real database it would destroy it. Set `TEST_DATABASE_URL` to override
+where it goes.
+
+Nothing leaves the process. `tests/conftest.py` blanks the mail credentials
+before the application is imported, and the tests that need mail switched on
+replace the sender itself, so a working Gmail app password in `.env` can never
+turn a test run into real mail.
+
+`tests/api/test_authorization.py` compares the application's own route list
+against a table of which endpoints are public and which require a session, so
+an endpoint added without deciding who may call it fails the suite rather than
+slipping through review.
+
+To run the suite on the host instead, install the test dependencies alongside
+the application's:
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
 ## Gmail notifications
 
 Accountant sends mail directly through Gmail SMTP; no additional mail service

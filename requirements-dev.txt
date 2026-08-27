@@ -1,0 +1,6 @@
+# Everything the application needs, plus what only the tests need.
+-r requirements.txt
+
+pytest>=8.4,<10.0
+# The test client speaks to the application in-process, without a socket.
+httpx>=0.28,<1.0

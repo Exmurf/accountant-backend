@@ -26,8 +26,8 @@ def test_a_limit_can_be_set_on_an_expense_category(
     )
 
     assert response.status_code == 200
-    assert response.json()["limit_minor"] == 150_000
-    assert response.json()["category_name"] == "Yemek"
+    assert response.json()["data"]["limit_minor"] == 150_000
+    assert response.json()["data"]["category_name"] == "Yemek"
 
 
 def test_setting_the_limit_again_replaces_it(
@@ -38,7 +38,7 @@ def test_setting_the_limit_again_replaces_it(
 
     client.put(f"/api/v1/budgets/{FOOD_CATEGORY_ID}", json={"limit": "900.00"})
 
-    listed = client.get("/api/v1/budgets").json()
+    listed = client.get("/api/v1/budgets").json()["data"]
     assert [item["limit_minor"] for item in listed] == [90_000]
 
 
@@ -81,7 +81,7 @@ def test_the_list_is_empty_until_a_limit_is_set(
     client: TestClient,
     account: Account,
 ) -> None:
-    assert client.get("/api/v1/budgets").json() == []
+    assert client.get("/api/v1/budgets").json()["data"] == []
 
 
 def test_a_limit_can_be_moved_to_another_category(
@@ -91,7 +91,7 @@ def test_a_limit_can_be_moved_to_another_category(
     budget = client.put(
         f"/api/v1/budgets/{FOOD_CATEGORY_ID}",
         json={"limit": "1500.00"},
-    ).json()
+    ).json()["data"]
 
     response = client.patch(
         f"/api/v1/budgets/{budget['id']}",
@@ -99,8 +99,8 @@ def test_a_limit_can_be_moved_to_another_category(
     )
 
     assert response.status_code == 200
-    assert response.json()["category_name"] == "Ulaşım"
-    assert response.json()["limit_minor"] == 60_000
+    assert response.json()["data"]["category_name"] == "Ulaşım"
+    assert response.json()["data"]["limit_minor"] == 60_000
 
 
 def test_two_limits_cannot_land_on_one_category(
@@ -111,7 +111,7 @@ def test_two_limits_cannot_land_on_one_category(
     transport = client.put(
         f"/api/v1/budgets/{TRANSPORT_CATEGORY_ID}",
         json={"limit": "600.00"},
-    ).json()
+    ).json()["data"]
 
     response = client.patch(
         f"/api/v1/budgets/{transport['id']}",
@@ -139,7 +139,7 @@ def test_a_limit_can_be_removed(client: TestClient, account: Account) -> None:
     response = client.delete(f"/api/v1/budgets/{FOOD_CATEGORY_ID}")
 
     assert response.status_code == 200
-    assert client.get("/api/v1/budgets").json() == []
+    assert client.get("/api/v1/budgets").json()["data"] == []
 
 
 def test_removing_a_limit_that_is_not_there_is_reported(
@@ -157,7 +157,7 @@ def test_one_account_cannot_see_anothers_limits(
 ) -> None:
     other_client.put(f"/api/v1/budgets/{FOOD_CATEGORY_ID}", json={"limit": "1500.00"})
 
-    assert client.get("/api/v1/budgets").json() == []
+    assert client.get("/api/v1/budgets").json()["data"] == []
 
 
 def test_one_account_cannot_remove_anothers_limits(
@@ -171,4 +171,4 @@ def test_one_account_cannot_remove_anothers_limits(
     response = client.delete(f"/api/v1/budgets/{FOOD_CATEGORY_ID}")
 
     assert response.status_code == 404
-    assert len(other_client.get("/api/v1/budgets").json()) == 1
+    assert len(other_client.get("/api/v1/budgets").json()["data"]) == 1

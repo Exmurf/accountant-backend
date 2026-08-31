@@ -87,7 +87,7 @@ def test_a_wrong_current_password_is_refused(
     )
 
     assert response.status_code == 422
-    assert response.json()["detail"] == "Mevcut şifren hatalı."
+    assert response.json()["data"]["detail"] == "Mevcut şifren hatalı."
 
 
 def test_the_new_password_has_to_be_different(
@@ -100,7 +100,7 @@ def test_the_new_password_has_to_be_different(
     )
 
     assert response.status_code == 422
-    assert response.json()["detail"] == "Yeni şifren mevcut şifrenden farklı olmalı."
+    assert response.json()["data"]["detail"] == "Yeni şifren mevcut şifrenden farklı olmalı."
 
 
 def test_guessing_the_current_password_is_rate_limited(
@@ -142,7 +142,7 @@ def test_asking_for_a_reset_link_says_the_same_thing_either_way(
 
     assert registered.status_code == 202
     assert unknown.status_code == 202
-    assert registered.json() == unknown.json()
+    assert registered.json()["data"] == unknown.json()["data"]
 
 
 def test_only_a_registered_address_actually_gets_a_mail(

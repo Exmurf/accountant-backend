@@ -12,7 +12,7 @@ def test_registering_returns_the_new_account(client: TestClient) -> None:
     response = register(client)
 
     assert response.status_code == 201
-    body = response.json()
+    body = response.json()["data"]
     assert body["email"] == "ahmet@mail.dev"
     assert body["display_name"] == "Ahmet"
     assert body["roles"] == ["USER"]
@@ -32,7 +32,7 @@ def test_the_response_never_carries_the_password(client: TestClient) -> None:
     response = register(client)
 
     assert "password" not in response.text
-    assert "password_hash" not in response.json()
+    assert "password_hash" not in response.json()["data"]
 
 
 def test_the_second_registration_of_one_address_is_refused(
@@ -43,7 +43,7 @@ def test_the_second_registration_of_one_address_is_refused(
     response = register(client)
 
     assert response.status_code == 409
-    assert response.json()["detail"] == "Bu e-posta adresi zaten kayıtlı."
+    assert response.json()["data"]["detail"] == "Bu e-posta adresi zaten kayıtlı."
 
 
 def test_a_short_password_is_refused_before_anything_is_written(

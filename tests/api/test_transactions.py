@@ -46,7 +46,7 @@ def test_an_entry_comes_back_with_its_category(
     response = client.post("/api/v1/transactions", json=expense())
 
     assert response.status_code == 201
-    body = response.json()
+    body = response.json()["data"]
     assert body["amount_minor"] == 5_000
     assert body["category_name"] == "Yemek"
     assert body["description"] == "Öğle yemeği"
@@ -59,7 +59,7 @@ def test_an_amount_is_stored_to_the_kuruş(
     """Money is kept as whole minor units, so nothing here ever rounds."""
     response = client.post("/api/v1/transactions", json=expense(amount="12.34"))
 
-    assert response.json()["amount_minor"] == 1_234
+    assert response.json()["data"]["amount_minor"] == 1_234
 
 
 def test_the_description_is_trimmed(client: TestClient, account: Account) -> None:
@@ -68,7 +68,7 @@ def test_the_description_is_trimmed(client: TestClient, account: Account) -> Non
         json=expense(description="  Öğle yemeği  "),
     )
 
-    assert response.json()["description"] == "Öğle yemeği"
+    assert response.json()["data"]["description"] == "Öğle yemeği"
 
 
 def test_a_new_entry_shows_up_in_the_days_list(
@@ -80,7 +80,7 @@ def test_a_new_entry_shows_up_in_the_days_list(
     listed = client.get("/api/v1/transactions", params=day_range())
 
     assert listed.status_code == 200
-    assert [item["description"] for item in listed.json()] == ["Öğle yemeği"]
+    assert [item["description"] for item in listed.json()["data"]] == ["Öğle yemeği"]
 
 
 def test_the_list_can_be_narrowed_by_kind(
@@ -95,7 +95,7 @@ def test_the_list_can_be_narrowed_by_kind(
         params={**day_range(), "kind": "INCOME"},
     )
 
-    assert [item["description"] for item in listed.json()] == ["Maaş"]
+    assert [item["description"] for item in listed.json()["data"]] == ["Maaş"]
 
 
 def test_the_list_can_be_narrowed_by_category(
@@ -110,7 +110,7 @@ def test_the_list_can_be_narrowed_by_category(
         params={**day_range(), "category_id": SALARY_CATEGORY_ID},
     )
 
-    assert [item["category_name"] for item in listed.json()] == ["Maaş"]
+    assert [item["category_name"] for item in listed.json()["data"]] == ["Maaş"]
 
 
 def test_a_range_without_a_timezone_is_refused(
@@ -159,7 +159,7 @@ def test_income_cannot_be_filed_under_an_expense_category(
     response = client.post("/api/v1/transactions", json=expense(kind="INCOME"))
 
     assert response.status_code == 422
-    assert response.json()["detail"] == "Kategori ile hareket türü uyuşmuyor."
+    assert response.json()["data"]["detail"] == "Kategori ile hareket türü uyuşmuyor."
 
 
 @pytest.mark.parametrize("amount", ["0", "-10.00", "1.234"])
@@ -174,7 +174,7 @@ def test_an_amount_that_is_not_positive_money_is_refused(
 
 
 def test_an_entry_can_be_edited(client: TestClient, account: Account) -> None:
-    created = client.post("/api/v1/transactions", json=expense()).json()
+    created = client.post("/api/v1/transactions", json=expense()).json()["data"]
 
     response = client.patch(
         f"/api/v1/transactions/{created['id']}",
@@ -182,8 +182,8 @@ def test_an_entry_can_be_edited(client: TestClient, account: Account) -> None:
     )
 
     assert response.status_code == 200
-    assert response.json()["amount_minor"] == 7_550
-    assert response.json()["description"] == "Akşam yemeği"
+    assert response.json()["data"]["amount_minor"] == 7_550
+    assert response.json()["data"]["description"] == "Akşam yemeği"
 
 
 def test_editing_an_entry_that_is_not_there_is_reported(
@@ -196,12 +196,12 @@ def test_editing_an_entry_that_is_not_there_is_reported(
 
 
 def test_an_entry_can_be_deleted(client: TestClient, account: Account) -> None:
-    created = client.post("/api/v1/transactions", json=expense()).json()
+    created = client.post("/api/v1/transactions", json=expense()).json()["data"]
 
     response = client.delete(f"/api/v1/transactions/{created['id']}")
 
     assert response.status_code == 200
-    assert client.get("/api/v1/transactions", params=day_range()).json() == []
+    assert client.get("/api/v1/transactions", params=day_range()).json()["data"] == []
 
 
 def test_deleting_an_entry_that_is_not_there_is_reported(
@@ -221,7 +221,7 @@ def test_one_account_cannot_see_anothers_entries(
 
     listed = client.get("/api/v1/transactions", params=wide_range())
 
-    assert listed.json() == []
+    assert listed.json()["data"] == []
 
 
 def test_one_account_cannot_delete_anothers_entries(
@@ -230,19 +230,19 @@ def test_one_account_cannot_delete_anothers_entries(
     account: Account,
     other_account: Account,
 ) -> None:
-    theirs = other_client.post("/api/v1/transactions", json=expense()).json()
+    theirs = other_client.post("/api/v1/transactions", json=expense()).json()["data"]
 
     response = client.delete(f"/api/v1/transactions/{theirs['id']}")
 
     assert response.status_code == 404
-    assert len(other_client.get("/api/v1/transactions", params=wide_range()).json()) == 1
+    assert len(other_client.get("/api/v1/transactions", params=wide_range()).json()["data"]) == 1
 
 
 def test_the_balance_starts_at_nothing(client: TestClient, account: Account) -> None:
     response = client.get("/api/v1/balance")
 
     assert response.status_code == 200
-    assert response.json() == {
+    assert response.json()["data"] == {
         "current_balance_minor": 0,
         "opening_balance_minor": 0,
         "total_income_minor": 0,
@@ -257,7 +257,7 @@ def test_the_balance_is_income_less_expense(
     client.post("/api/v1/transactions", json=income())
     client.post("/api/v1/transactions", json=expense())
 
-    body = client.get("/api/v1/balance").json()
+    body = client.get("/api/v1/balance").json()["data"]
 
     assert body["total_income_minor"] == 100_000
     assert body["total_expense_minor"] == 5_000
@@ -271,7 +271,7 @@ def test_the_opening_amount_is_added_to_the_balance(
     client.put("/api/v1/balance/opening", json={"amount": "250.00"})
     client.post("/api/v1/transactions", json=expense())
 
-    body = client.get("/api/v1/balance").json()
+    body = client.get("/api/v1/balance").json()["data"]
 
     assert body["opening_balance_minor"] == 25_000
     assert body["current_balance_minor"] == 20_000
@@ -285,15 +285,15 @@ def test_the_opening_amount_may_be_negative(
     response = client.put("/api/v1/balance/opening", json={"amount": "-100.00"})
 
     assert response.status_code == 200
-    assert response.json()["current_balance_minor"] == -10_000
+    assert response.json()["data"]["current_balance_minor"] == -10_000
 
 
 def test_deleting_an_entry_takes_it_back_out_of_the_balance(
     client: TestClient,
     account: Account,
 ) -> None:
-    created = client.post("/api/v1/transactions", json=expense()).json()
+    created = client.post("/api/v1/transactions", json=expense()).json()["data"]
 
     client.delete(f"/api/v1/transactions/{created['id']}")
 
-    assert client.get("/api/v1/balance").json()["total_expense_minor"] == 0
+    assert client.get("/api/v1/balance").json()["data"]["total_expense_minor"] == 0

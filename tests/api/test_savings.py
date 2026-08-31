@@ -31,7 +31,7 @@ def test_a_new_account_has_nothing_saved_yet(
     response = client.post("/api/v1/savings/process-month-end")
 
     assert response.status_code == 200
-    assert response.json() == {
+    assert response.json()["data"] == {
         "total_saved_minor": 0,
         "current_month_projection_minor": 0,
         "goal_minor": 0,
@@ -49,7 +49,7 @@ def test_a_finished_month_is_closed_and_kept(
         json=entry("INCOME", "1000.00", last_month.isoformat()),
     )
 
-    body = client.post("/api/v1/savings/process-month-end").json()
+    body = client.post("/api/v1/savings/process-month-end").json()["data"]
 
     assert body["total_saved_minor"] == 100_000
     assert [(item["year"], item["month"]) for item in body["entries"]] == [
@@ -68,7 +68,7 @@ def test_the_month_in_progress_is_only_a_projection(
         json=entry("INCOME", "500.00", today().isoformat()),
     )
 
-    body = client.post("/api/v1/savings/process-month-end").json()
+    body = client.post("/api/v1/savings/process-month-end").json()["data"]
 
     assert body["current_month_projection_minor"] == 50_000
     assert body["entries"] == []
@@ -86,7 +86,7 @@ def test_savings_never_fall_below_nothing(
         json=entry("EXPENSE", "800.00", last_month.isoformat()),
     )
 
-    body = client.post("/api/v1/savings/process-month-end").json()
+    body = client.post("/api/v1/savings/process-month-end").json()["data"]
 
     assert body["total_saved_minor"] == 0
 
@@ -102,7 +102,7 @@ def test_running_it_twice_does_not_double_the_total(
     )
     client.post("/api/v1/savings/process-month-end")
 
-    body = client.post("/api/v1/savings/process-month-end").json()
+    body = client.post("/api/v1/savings/process-month-end").json()["data"]
 
     assert body["total_saved_minor"] == 100_000
     assert len(body["entries"]) == 1
@@ -115,8 +115,8 @@ def test_the_goal_is_stored_and_read_back(
     response = client.put("/api/v1/savings/goal", json={"goal": "5000.00"})
 
     assert response.status_code == 200
-    assert response.json()["goal_minor"] == 500_000
-    assert client.post("/api/v1/savings/process-month-end").json()["goal_minor"] == 500_000
+    assert response.json()["data"]["goal_minor"] == 500_000
+    assert client.post("/api/v1/savings/process-month-end").json()["data"]["goal_minor"] == 500_000
 
 
 def test_a_goal_of_nothing_clears_it(client: TestClient, account: Account) -> None:
@@ -124,7 +124,7 @@ def test_a_goal_of_nothing_clears_it(client: TestClient, account: Account) -> No
 
     response = client.put("/api/v1/savings/goal", json={"goal": "0"})
 
-    assert response.json()["goal_minor"] == 0
+    assert response.json()["data"]["goal_minor"] == 0
 
 
 def test_a_negative_goal_is_refused(client: TestClient, account: Account) -> None:
@@ -143,6 +143,6 @@ def test_one_account_does_not_see_anothers_savings(
     )
     other_client.post("/api/v1/savings/process-month-end")
 
-    body = client.post("/api/v1/savings/process-month-end").json()
+    body = client.post("/api/v1/savings/process-month-end").json()["data"]
 
     assert body["total_saved_minor"] == 0

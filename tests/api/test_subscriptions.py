@@ -37,7 +37,7 @@ def test_a_subscription_bills_on_the_day_it_starts(
     response = client.post("/api/v1/subscriptions", json=subscription())
 
     assert response.status_code == 201
-    body = response.json()
+    body = response.json()["data"]
     assert body["amount_minor"] == 6_000
     assert body["billing_day"] == today().day
     assert body["next_charge_date"] == today().isoformat()
@@ -49,7 +49,7 @@ def test_the_name_is_trimmed(client: TestClient, account: Account) -> None:
         json=subscription(name="  Müzik servisi  "),
     )
 
-    assert response.json()["name"] == "Müzik servisi"
+    assert response.json()["data"]["name"] == "Müzik servisi"
 
 
 def test_a_new_subscription_shows_up_in_the_list(
@@ -60,7 +60,7 @@ def test_a_new_subscription_shows_up_in_the_list(
 
     listed = client.get("/api/v1/subscriptions")
 
-    assert [item["name"] for item in listed.json()] == ["Müzik servisi"]
+    assert [item["name"] for item in listed.json()["data"]] == ["Müzik servisi"]
 
 
 def test_an_unknown_category_is_refused(
@@ -76,7 +76,7 @@ def test_an_unknown_category_is_refused(
 
 
 def test_a_subscription_can_be_edited(client: TestClient, account: Account) -> None:
-    created = client.post("/api/v1/subscriptions", json=subscription()).json()
+    created = client.post("/api/v1/subscriptions", json=subscription()).json()["data"]
 
     response = client.patch(
         f"/api/v1/subscriptions/{created['id']}",
@@ -89,9 +89,9 @@ def test_a_subscription_can_be_edited(client: TestClient, account: Account) -> N
     )
 
     assert response.status_code == 200
-    assert response.json()["name"] == "Yemek kutusu"
-    assert response.json()["amount_minor"] == 12_000
-    assert response.json()["billing_day"] == 5
+    assert response.json()["data"]["name"] == "Yemek kutusu"
+    assert response.json()["data"]["amount_minor"] == 12_000
+    assert response.json()["data"]["billing_day"] == 5
 
 
 @pytest.mark.parametrize("billing_day", [0, 32])
@@ -100,7 +100,7 @@ def test_a_billing_day_outside_the_month_is_refused(
     account: Account,
     billing_day: int,
 ) -> None:
-    created = client.post("/api/v1/subscriptions", json=subscription()).json()
+    created = client.post("/api/v1/subscriptions", json=subscription()).json()["data"]
 
     response = client.patch(
         f"/api/v1/subscriptions/{created['id']}",
@@ -136,12 +136,12 @@ def test_a_subscription_can_be_cancelled(
     client: TestClient,
     account: Account,
 ) -> None:
-    created = client.post("/api/v1/subscriptions", json=subscription()).json()
+    created = client.post("/api/v1/subscriptions", json=subscription()).json()["data"]
 
     response = client.delete(f"/api/v1/subscriptions/{created['id']}")
 
     assert response.status_code == 200
-    assert client.get("/api/v1/subscriptions").json() == []
+    assert client.get("/api/v1/subscriptions").json()["data"] == []
 
 
 def test_cancelling_one_that_is_not_there_is_reported(
@@ -160,8 +160,8 @@ def test_a_due_charge_becomes_a_real_entry(
     posted = client.post("/api/v1/subscriptions/process-due")
 
     assert posted.status_code == 200
-    assert [item["description"] for item in posted.json()] == ["Müzik servisi"]
-    assert client.get("/api/v1/balance").json()["total_expense_minor"] == 6_000
+    assert [item["description"] for item in posted.json()["data"]] == ["Müzik servisi"]
+    assert client.get("/api/v1/balance").json()["data"]["total_expense_minor"] == 6_000
 
 
 def test_the_posted_charge_carries_its_date(
@@ -170,7 +170,7 @@ def test_the_posted_charge_carries_its_date(
 ) -> None:
     client.post("/api/v1/subscriptions", json=subscription())
 
-    posted = client.post("/api/v1/subscriptions/process-due").json()
+    posted = client.post("/api/v1/subscriptions/process-due").json()["data"]
 
     assert posted[0]["subscription_charge_date"] == today().isoformat()
 
@@ -186,8 +186,8 @@ def test_running_it_again_posts_nothing(
 
     second = client.post("/api/v1/subscriptions/process-due")
 
-    assert second.json() == []
-    assert len(client.get("/api/v1/transactions", params=day_range()).json()) == 1
+    assert second.json()["data"] == []
+    assert len(client.get("/api/v1/transactions", params=day_range()).json()["data"]) == 1
 
 
 def test_a_subscription_that_is_not_due_posts_nothing(
@@ -199,17 +199,17 @@ def test_a_subscription_that_is_not_due_posts_nothing(
         json=subscription(first_charge_date=tomorrow().isoformat()),
     )
 
-    assert client.post("/api/v1/subscriptions/process-due").json() == []
+    assert client.post("/api/v1/subscriptions/process-due").json()["data"] == []
 
 
 def test_a_cancelled_subscription_stops_being_charged(
     client: TestClient,
     account: Account,
 ) -> None:
-    created = client.post("/api/v1/subscriptions", json=subscription()).json()
+    created = client.post("/api/v1/subscriptions", json=subscription()).json()["data"]
     client.delete(f"/api/v1/subscriptions/{created['id']}")
 
-    assert client.post("/api/v1/subscriptions/process-due").json() == []
+    assert client.post("/api/v1/subscriptions/process-due").json()["data"] == []
 
 
 def test_one_account_cannot_see_anothers_subscriptions(
@@ -220,7 +220,7 @@ def test_one_account_cannot_see_anothers_subscriptions(
 ) -> None:
     other_client.post("/api/v1/subscriptions", json=subscription(name="Gizli"))
 
-    assert client.get("/api/v1/subscriptions").json() == []
+    assert client.get("/api/v1/subscriptions").json()["data"] == []
 
 
 def test_one_account_cannot_cancel_anothers_subscription(
@@ -229,12 +229,12 @@ def test_one_account_cannot_cancel_anothers_subscription(
     account: Account,
     other_account: Account,
 ) -> None:
-    theirs = other_client.post("/api/v1/subscriptions", json=subscription()).json()
+    theirs = other_client.post("/api/v1/subscriptions", json=subscription()).json()["data"]
 
     response = client.delete(f"/api/v1/subscriptions/{theirs['id']}")
 
     assert response.status_code == 404
-    assert len(other_client.get("/api/v1/subscriptions").json()) == 1
+    assert len(other_client.get("/api/v1/subscriptions").json()["data"]) == 1
 
 
 def test_processing_charges_only_the_account_that_asked(
@@ -245,5 +245,5 @@ def test_processing_charges_only_the_account_that_asked(
 ) -> None:
     other_client.post("/api/v1/subscriptions", json=subscription())
 
-    assert client.post("/api/v1/subscriptions/process-due").json() == []
-    assert other_client.get("/api/v1/transactions", params=wide_range()).json() == []
+    assert client.post("/api/v1/subscriptions/process-due").json()["data"] == []
+    assert other_client.get("/api/v1/transactions", params=wide_range()).json()["data"] == []

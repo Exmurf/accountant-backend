@@ -22,9 +22,9 @@ def test_settings_are_saved_and_read_back(
     response = client.patch("/api/v1/auth/me", json=SETTINGS)
 
     assert response.status_code == 200
-    assert response.json()["display_name"] == "Ahmet Faruk"
-    assert response.json()["daily_summary_time"] == "08:30:00"
-    assert client.get("/api/v1/auth/me").json()["budget_alerts_enabled"] is False
+    assert response.json()["data"]["display_name"] == "Ahmet Faruk"
+    assert response.json()["data"]["daily_summary_time"] == "08:30:00"
+    assert client.get("/api/v1/auth/me").json()["data"]["budget_alerts_enabled"] is False
 
 
 def test_the_display_name_is_trimmed(client: TestClient, account: Account) -> None:
@@ -33,7 +33,7 @@ def test_the_display_name_is_trimmed(client: TestClient, account: Account) -> No
         json={**SETTINGS, "display_name": "  Ahmet Faruk  "},
     )
 
-    assert response.json()["display_name"] == "Ahmet Faruk"
+    assert response.json()["data"]["display_name"] == "Ahmet Faruk"
 
 
 def test_a_one_letter_display_name_is_refused(

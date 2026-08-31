@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
+from app.presentation.http.response_envelope import ApiResponseEnvelopeMiddleware
 from app.presentation.http.router import api_router
 from app.infrastructure.ledger.runtime import subscription_scheduler
 from app.infrastructure.notifications.runtime import (
@@ -44,6 +45,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    application.add_middleware(ApiResponseEnvelopeMiddleware)
     application.include_router(api_router, prefix="/api/v1")
 
     return application

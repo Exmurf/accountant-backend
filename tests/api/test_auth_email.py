@@ -72,7 +72,7 @@ def test_nothing_changes_until_the_link_is_followed(
 ) -> None:
     ask_to_move(client)
 
-    assert client.get("/api/v1/auth/me").json()["email"] == account.email
+    assert client.get("/api/v1/auth/me").json()["data"]["email"] == account.email
 
 
 def test_following_the_link_moves_the_account(
@@ -87,7 +87,7 @@ def test_following_the_link_moves_the_account(
     response = client.post("/api/v1/auth/email/confirm", json={"token": token})
 
     assert response.status_code == 200
-    assert response.json()["email"] == NEW_EMAIL
+    assert response.json()["data"]["email"] == NEW_EMAIL
 
 
 def test_after_moving_the_new_address_is_the_one_that_signs_in(
@@ -165,7 +165,7 @@ def test_moving_to_the_current_address_is_refused(
     response = ask_to_move(client, new_email=account.email)
 
     assert response.status_code == 422
-    assert response.json()["detail"] == "Bu zaten mevcut e-posta adresin."
+    assert response.json()["data"]["detail"] == "Bu zaten mevcut e-posta adresin."
 
 
 def test_an_address_no_mail_can_reach_is_refused(

@@ -19,7 +19,7 @@ def test_the_right_password_opens_a_session(
     response = sign_in(client)
 
     assert response.status_code == 200
-    assert response.json()["email"] == account.email
+    assert response.json()["data"]["email"] == account.email
     assert client.get("/api/v1/auth/me").status_code == 200
 
 
@@ -38,7 +38,7 @@ def test_a_wrong_password_is_refused(client: TestClient, account: Account) -> No
     response = sign_in(client, password="yanlisparola")
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "E-posta veya şifre hatalı."
+    assert response.json()["data"]["detail"] == "E-posta veya şifre hatalı."
 
 
 def test_an_unknown_address_is_refused_the_same_way(client: TestClient) -> None:
@@ -47,7 +47,7 @@ def test_an_unknown_address_is_refused_the_same_way(client: TestClient) -> None:
     response = sign_in(client, email="kimse@mail.dev")
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "E-posta veya şifre hatalı."
+    assert response.json()["data"]["detail"] == "E-posta veya şifre hatalı."
 
 
 def test_a_deactivated_account_is_told_it_is_deactivated(
@@ -64,7 +64,7 @@ def test_a_deactivated_account_is_told_it_is_deactivated(
     response = sign_in(client)
 
     assert response.status_code == 403
-    assert response.json()["detail"] == "Kullanıcı hesabı devre dışı."
+    assert response.json()["data"]["detail"] == "Kullanıcı hesabı devre dışı."
 
 
 def test_repeated_wrong_passwords_lock_the_address(

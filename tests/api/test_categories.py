@@ -17,9 +17,9 @@ def test_a_new_account_already_has_categories_to_spend_against(
     response = client.get("/api/v1/categories")
 
     assert response.status_code == 200
-    names = {item["name"] for item in response.json()}
+    names = {item["name"] for item in response.json()["data"]}
     assert {"Yemek", "Maaş"} <= names
-    assert all(item["is_default"] for item in response.json())
+    assert all(item["is_default"] for item in response.json()["data"])
 
 
 def test_the_list_can_be_narrowed_to_one_kind(
@@ -28,7 +28,7 @@ def test_the_list_can_be_narrowed_to_one_kind(
 ) -> None:
     response = client.get("/api/v1/categories", params={"kind": "INCOME"})
 
-    assert {item["kind"] for item in response.json()} == {"INCOME"}
+    assert {item["kind"] for item in response.json()["data"]} == {"INCOME"}
 
 
 def test_a_created_category_is_marked_as_the_users_own(
@@ -38,8 +38,8 @@ def test_a_created_category_is_marked_as_the_users_own(
     response = client.post("/api/v1/categories", json=NEW_CATEGORY)
 
     assert response.status_code == 201
-    assert response.json()["name"] == "Kahve"
-    assert response.json()["is_default"] is False
+    assert response.json()["data"]["name"] == "Kahve"
+    assert response.json()["data"]["is_default"] is False
 
 
 def test_a_created_category_shows_up_in_the_list(
@@ -48,7 +48,7 @@ def test_a_created_category_shows_up_in_the_list(
 ) -> None:
     client.post("/api/v1/categories", json=NEW_CATEGORY)
 
-    names = {item["name"] for item in client.get("/api/v1/categories").json()}
+    names = {item["name"] for item in client.get("/api/v1/categories").json()["data"]}
     assert "Kahve" in names
 
 
@@ -95,5 +95,5 @@ def test_another_accounts_category_is_not_visible(
 ) -> None:
     other_client.post("/api/v1/categories", json={**NEW_CATEGORY, "name": "Gizli"})
 
-    names = {item["name"] for item in client.get("/api/v1/categories").json()}
+    names = {item["name"] for item in client.get("/api/v1/categories").json()["data"]}
     assert "Gizli" not in names

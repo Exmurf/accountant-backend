@@ -118,7 +118,7 @@ def account(client: TestClient) -> Account:
     """A registered user, with the client already holding its session."""
     response = register(client)
     assert response.status_code == 201, response.text
-    body = response.json()
+    body = response.json()["data"]
     return Account(
         id=UUID(body["id"]),
         email=body["email"],
@@ -147,7 +147,7 @@ def other_account(other_client: TestClient) -> Account:
         display_name="Başkası",
     )
     assert response.status_code == 201, response.text
-    body = response.json()
+    body = response.json()["data"]
     return Account(
         id=UUID(body["id"]),
         email=body["email"],

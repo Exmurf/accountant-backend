@@ -17,7 +17,7 @@ def test_me_describes_the_signed_in_account(
     response = client.get("/api/v1/auth/me")
 
     assert response.status_code == 200
-    body = response.json()
+    body = response.json()["data"]
     assert body["id"] == str(account.id)
     assert body["email"] == account.email
     assert "password_hash" not in body
@@ -27,7 +27,7 @@ def test_me_without_a_session_is_refused(client: TestClient) -> None:
     response = client.get("/api/v1/auth/me")
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Oturum açmanız gerekiyor."
+    assert response.json()["data"]["detail"] == "Oturum açmanız gerekiyor."
 
 
 def test_a_cookie_that_is_not_a_token_is_refused(client: TestClient) -> None:

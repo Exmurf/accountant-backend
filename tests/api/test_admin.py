@@ -26,7 +26,7 @@ def test_an_ordinary_account_is_turned_away(
     response = client.get("/api/v1/admin/users")
 
     assert response.status_code == 403
-    assert response.json()["detail"] == FORBIDDEN
+    assert response.json()["data"]["detail"] == FORBIDDEN
 
 
 def test_an_ordinary_account_cannot_read_another_users_finances(
@@ -61,7 +61,7 @@ def test_an_administrator_sees_every_account(
     response = client.get("/api/v1/admin/users")
 
     assert response.status_code == 200
-    assert {item["email"] for item in response.json()} == {
+    assert {item["email"] for item in response.json()["data"]} == {
         admin.email,
         other_account.email,
     }
@@ -85,7 +85,7 @@ def test_a_summary_adds_up_the_accounts_money(
 
     summary = next(
         item
-        for item in client.get("/api/v1/admin/users").json()
+        for item in client.get("/api/v1/admin/users").json()["data"]
         if item["email"] == admin.email
     )
 
@@ -123,7 +123,7 @@ def test_an_administrator_can_read_one_accounts_detail(
     response = client.get(f"/api/v1/admin/users/{other_account.id}/finance")
 
     assert response.status_code == 200
-    body = response.json()
+    body = response.json()["data"]
     assert [item["description"] for item in body["recent_transactions"]] == [
         "Öğle yemeği"
     ]
@@ -151,7 +151,7 @@ def test_an_administrator_can_deactivate_somebody(
     )
 
     assert response.status_code == 200
-    assert response.json()["is_active"] is False
+    assert response.json()["data"]["is_active"] is False
     assert other_client.get("/api/v1/auth/me").status_code == 401
 
 

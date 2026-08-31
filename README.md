@@ -47,6 +47,11 @@ backend Docker Compose passes the same settings through container environment
 variables. The frontend is a separate repository and is not required to build
 or start this project.
 
+The example contains only values that belong to the operator-managed `.env`.
+Compose derives `DATABASE_URL` from the PostgreSQL settings and injects
+`REDIS_URL`; production also forces secure cookies and its trusted proxy range.
+Those generated values are deliberately not duplicated in `.env`.
+
 ## Tests
 
 The development image carries the test runner, so the suite runs where the
@@ -125,6 +130,9 @@ part of the password and Gmail answers `535 Authentication failed`.
 Docker Compose starts Redis alongside PostgreSQL and the API. Ledger reads are
 served from it and invalidated automatically when anything is written, so
 nothing has to be cleared by hand.
+
+When running Uvicorn directly on the host instead of through Docker, opt into
+the host Redis instance explicitly:
 
 ```env
 REDIS_URL=redis://localhost:6379/0

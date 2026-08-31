@@ -12,7 +12,6 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    api_port: int = 3001
     web_origin: str = "http://localhost:3000"
     # Addresses or CIDR blocks whose `X-Forwarded-For` may be believed. Empty
     # means nothing is trusted, which is right whenever the service is reached

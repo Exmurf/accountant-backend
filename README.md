@@ -54,23 +54,12 @@ Those generated values are deliberately not duplicated in `.env`.
 
 ### Cloudflare-only production origin
 
-Production publishes only the Caddy container on ports 80 and 443. After the
-domain is proxied through Cloudflare, install
-`ops/cloudflare-origin-firewall.sh` and its systemd unit on the VM to reject
-direct web requests to the Azure address while leaving SSH untouched:
-
-```bash
-sudo install -m 0755 ops/cloudflare-origin-firewall.sh \
-  /usr/local/sbin/accountant-cloudflare-origin-firewall
-sudo install -m 0644 ops/accountant-cloudflare-firewall.service \
-  /etc/systemd/system/accountant-cloudflare-firewall.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now accountant-cloudflare-firewall.service
-```
-
-The allowlist comes from Cloudflare's published IPv4 and IPv6 ranges. Verify it
-with `sudo accountant-cloudflare-origin-firewall status`. To recover direct
-origin access, run `sudo systemctl stop accountant-cloudflare-firewall`.
+Production publishes only the Caddy container on ports 80 and 443. The Azure
+network security group allows those ports from Cloudflare's published IPv4
+ranges at priority 100 and denies them from every other source at priority 110.
+SSH remains a separate rule. This filtering belongs at the Azure network edge,
+before Docker, so requests to the VM address cannot bypass Cloudflare's WAF.
+Update the allow rule whenever Cloudflare changes its official IP ranges.
 
 ## Tests
 

@@ -1,0 +1,14 @@
+[Unit]
+Description=Allow Accountant web traffic only through Cloudflare
+Requires=docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/accountant-cloudflare-origin-firewall apply
+ExecReload=/usr/local/sbin/accountant-cloudflare-origin-firewall apply
+ExecStop=/usr/local/sbin/accountant-cloudflare-origin-firewall remove
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

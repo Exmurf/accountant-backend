@@ -52,6 +52,26 @@ Compose derives `DATABASE_URL` from the PostgreSQL settings and injects
 `REDIS_URL`; production also forces secure cookies and its trusted proxy range.
 Those generated values are deliberately not duplicated in `.env`.
 
+### Cloudflare-only production origin
+
+Production publishes only the Caddy container on ports 80 and 443. After the
+domain is proxied through Cloudflare, install
+`ops/cloudflare-origin-firewall.sh` and its systemd unit on the VM to reject
+direct web requests to the Azure address while leaving SSH untouched:
+
+```bash
+sudo install -m 0755 ops/cloudflare-origin-firewall.sh \
+  /usr/local/sbin/accountant-cloudflare-origin-firewall
+sudo install -m 0644 ops/accountant-cloudflare-firewall.service \
+  /etc/systemd/system/accountant-cloudflare-firewall.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now accountant-cloudflare-firewall.service
+```
+
+The allowlist comes from Cloudflare's published IPv4 and IPv6 ranges. Verify it
+with `sudo accountant-cloudflare-origin-firewall status`. To recover direct
+origin access, run `sudo systemctl stop accountant-cloudflare-firewall`.
+
 ## Tests
 
 The development image carries the test runner, so the suite runs where the

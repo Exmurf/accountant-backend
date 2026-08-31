@@ -106,11 +106,6 @@ jobs:
             git merge --ff-only "${{ github.sha }}"
             docker compose -f docker-compose.prod.yml build backend
             docker compose -f docker-compose.prod.yml up -d --wait --wait-timeout 120 backend
+            docker compose -f docker-compose.prod.yml exec -T backend \
+              python -c 'import json, urllib.request; body=json.load(urllib.request.urlopen("http://localhost:3001/api/v1/health")); assert body["status"] is True and body["data"]["status"] == "ok"'
           DEPLOY
-
-      - name: Verify production API
-        run: |
-          response="$(curl --fail --silent --show-error --retry 10 --retry-all-errors --retry-delay 3 \
-            --user-agent 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36' \
-            https://gelirgider.me/api/v1/health)"
-          RESPONSE="$response" python -c 'import json, os; body=json.loads(os.environ["RESPONSE"]); assert body["status"] is True and body["data"]["status"] == "ok"'

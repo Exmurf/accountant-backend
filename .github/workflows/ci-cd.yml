@@ -110,5 +110,7 @@ jobs:
 
       - name: Verify production API
         run: |
-          response="$(curl --fail --silent --show-error --retry 10 --retry-delay 3 https://gelirgider.me/api/v1/health)"
+          response="$(curl --fail --silent --show-error --retry 10 --retry-all-errors --retry-delay 3 \
+            --user-agent 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36' \
+            https://gelirgider.me/api/v1/health)"
           RESPONSE="$response" python -c 'import json, os; body=json.loads(os.environ["RESPONSE"]); assert body["status"] is True and body["data"]["status"] == "ok"'

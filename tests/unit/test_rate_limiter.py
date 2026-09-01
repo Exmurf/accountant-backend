@@ -4,7 +4,12 @@ The limiter takes its clock as an argument, which is what makes a fifteen
 minute window testable in microseconds.
 """
 
-from app.infrastructure.security.rate_limit import InMemoryRateLimiter
+from redis.exceptions import RedisError
+
+from app.infrastructure.security.rate_limit import (
+    InMemoryRateLimiter,
+    RedisRateLimiter,
+)
 
 LIMIT = 5
 WINDOW = 900
@@ -114,3 +119,21 @@ def test_keys_nobody_has_touched_are_swept_away() -> None:
     limiter.record("login:sonuncu", WINDOW)
 
     assert list(limiter._buckets) == ["login:sonuncu"]
+
+
+class UnreachableRedis:
+    def register_script(self, script: str):  # type: ignore[no-untyped-def]
+        def fail(*args, **kwargs):  # type: ignore[no-untyped-def]
+            raise RedisError("test outage")
+
+        return fail
+
+    def delete(self, key: str) -> None:
+        raise RedisError("test outage")
+
+
+def test_a_redis_outage_keeps_a_local_limit() -> None:
+    limiter = RedisRateLimiter(UnreachableRedis())  # type: ignore[arg-type]
+    spend(limiter, "login:ahmet", LIMIT)
+
+    assert limiter.peek("login:ahmet", LIMIT, WINDOW) is not None

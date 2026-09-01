@@ -169,8 +169,11 @@ REGISTER_MAX_ATTEMPTS=5
 REGISTER_WINDOW_SECONDS=3600
 ```
 
-The counters are held in the API process, so restarting it clears every
-outstanding lockout.
+When `REDIS_URL` is configured, the counters live in Redis and are shared by
+every API process. Restarting or deploying the API therefore does not clear an
+outstanding lockout. A temporary Redis outage falls back to a process-local
+window, so the protection does not silently switch off. Running without a
+Redis URL uses that local limiter directly.
 
 ## Password reset
 

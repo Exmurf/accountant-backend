@@ -29,8 +29,18 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       TEST_DATABASE_URL: postgresql+psycopg://accountant:accountant_ci_password@localhost:5432/accountant_test
+      TEST_REDIS_URL: redis://localhost:6379/15
     steps:
       - name: Check out source
         uses: actions/checkout@v7

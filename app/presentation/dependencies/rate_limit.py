@@ -1,18 +1,42 @@
+import logging
 from functools import lru_cache
 from ipaddress import IPv4Network, IPv6Network, ip_address
 
 from fastapi import HTTPException, Request, status
+from redis import Redis
+from redis.exceptions import RedisError
 
 from app.application.security.ports import RateLimiter
 from app.core.config import get_settings
-from app.infrastructure.security.rate_limit import InMemoryRateLimiter
+from app.infrastructure.security.rate_limit import (
+    InMemoryRateLimiter,
+    RedisRateLimiter,
+)
 
-# One window shared by every request, so it has to outlive the request scope.
-_limiter = InMemoryRateLimiter()
+logger = logging.getLogger(__name__)
 
 
+@lru_cache
 def get_rate_limiter() -> RateLimiter:
-    return _limiter
+    settings = get_settings()
+    if not settings.redis_url:
+        return InMemoryRateLimiter()
+
+    client = Redis.from_url(
+        settings.redis_url,
+        decode_responses=True,
+        socket_timeout=0.25,
+        socket_connect_timeout=0.25,
+        retry_on_timeout=False,
+    )
+    try:
+        client.ping()
+        logger.info("Rate-limit Redis connected")
+    except RedisError as error:
+        # The limiter itself retains an in-process fallback and will notice
+        # when Redis recovers, so a slow start does not disable protection.
+        logger.warning("Rate-limit Redis unreachable at start-up: %s", error)
+    return RedisRateLimiter(client)
 
 
 # Bounded on purpose: the addresses asked about include forwarded ones, which
